@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#2f6b4f">
+<meta name="theme-color" content="#5c4f3f">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Analyse courses</title>
@@ -14,8 +14,8 @@
     --ink:#1f2421;
     --ink-soft:#5b635d;
     --line:#e2ded3;
-    --accent:#2f6b4f;
-    --accent-soft:#e6efe9;
+    --accent:#5c4f3f;
+    --accent-soft:#ede6d7;
     --danger:#a8412f;
     --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
   }
@@ -72,6 +72,21 @@
   .bilan td.montant{font-variant-numeric:tabular-nums}
   .bilan tr.total td{font-weight:700;border-top:2px solid var(--line)}
   .note{font-size:12px;color:var(--ink-soft);margin:8px 0 0}
+  .filtre-periode{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
+  .filtre-periode button{
+    padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:999px;
+    font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+  }
+  .filtre-periode button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .perso-champs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;width:100%}
+  .perso-champs label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ink-soft)}
+  .perso-champs input{width:auto}
+  .pie-wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .pie-wrap .chart-box{flex:1 1 260px;min-width:220px}
+  .pie-legende{flex:1 1 200px;min-width:180px;display:flex;flex-direction:column;gap:5px}
+  .pie-legende .lg-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink)}
+  .pie-legende .lg-sw{width:12px;height:12px;border-radius:3px;flex:none}
+  .pie-legende .lg-val{margin-left:auto;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
   /* modale */
   .overlay{position:fixed;inset:0;background:rgba(20,24,22,.42);display:none;align-items:flex-end;justify-content:center;z-index:50}
   .overlay.on{display:flex}
@@ -86,7 +101,20 @@
   .banniere.on{display:block}
   .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;display:none;align-items:center;gap:12px;z-index:60}
   .toast.on{display:flex}
-  .toast button{background:none;border:none;color:#8fd0b0;font:inherit;font-weight:700;cursor:pointer}
+  .toast button{background:none;border:none;color:#d8c4a6;font:inherit;font-weight:700;cursor:pointer}
+  .sous-tabs{margin-top:0}
+  .filtres label.ligne-check{flex-direction:row;align-items:center;gap:6px;font-size:13px;color:var(--ink);min-width:0}
+  .filtres label.ligne-check input{width:auto}
+  td.tk-check{width:34px;text-align:center}
+  td.tk-check input{width:18px;height:18px}
+  tr.tk-ligne{cursor:pointer}
+  tr.tk-ligne:hover{background:var(--accent-soft)}
+  tr.tk-ligne.ouvert{background:var(--accent-soft)}
+  tr.tk-detail>td{padding:0;border-bottom:1px solid var(--line);background:#faf8f3}
+  tr.tk-detail table{margin:0}
+  tr.tk-detail th,tr.tk-detail td{border-bottom:1px solid var(--line);font-size:12.5px}
+  tr.tk-detail tr:last-child td{border-bottom:none}
+  .tk-pointe td{color:var(--ink-soft)}
 </style>
 </head>
 <body>
@@ -105,50 +133,107 @@
 
   <!-- VUE DÉPENSES -->
   <section id="vue-depenses">
-    <div class="barre-actions">
-      <span class="tot-ligne">Filtré : <b id="tot-filtre">–</b> · <span id="nb-filtre">0</span> ligne(s)</span>
-      <button class="btn" onclick="ouvrirFormAjout()">+ Ajouter</button>
+    <div class="tabs sous-tabs">
+      <button id="sous-tab-detail" class="actif" onclick="montrerSousVue('detail')">Détail</button>
+      <button id="sous-tab-tickets" onclick="montrerSousVue('tickets')">Tickets</button>
     </div>
 
-    <div class="card">
-      <div class="filtres">
-        <label>Mois
-          <select id="f-mois" onchange="rendreDepenses()"><option value="">Tous</option></select>
-        </label>
-        <label>Magasin
-          <select id="f-magasin" onchange="rendreDepenses()"><option value="">Tous</option></select>
-        </label>
-        <label>Catégorie
-          <select id="f-cat" onchange="rendreDepenses()"><option value="">Toutes</option></select>
-        </label>
+    <!-- SOUS-VUE DÉTAIL -->
+    <div id="sous-vue-detail">
+      <div class="barre-actions">
+        <span class="tot-ligne">Filtré : <b id="tot-filtre">–</b> · <span id="nb-filtre">0</span> ligne(s)</span>
+        <button class="btn" onclick="ouvrirFormAjout()">+ Ajouter</button>
+      </div>
+
+      <div class="card">
+        <div class="filtres">
+          <label>Mois
+            <select id="f-mois" onchange="rendreDepenses()"><option value="">Tous</option></select>
+          </label>
+          <label>Magasin
+            <select id="f-magasin" onchange="rendreDepenses()"><option value="">Tous</option></select>
+          </label>
+          <label>Catégorie
+            <select id="f-cat" onchange="rendreDepenses()"><option value="">Toutes</option></select>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tableau-scroll">
+          <table id="tbl-depenses">
+            <thead>
+              <tr><th>Date</th><th>Magasin</th><th>Catégorie</th><th>Article</th><th class="montant">Montant</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="vide" id="depenses-vide" style="display:none">Aucune dépense pour ces filtres.</div>
       </div>
     </div>
 
-    <div class="card">
-      <div class="tableau-scroll">
-        <table id="tbl-depenses">
-          <thead>
-            <tr><th>Date</th><th>Magasin</th><th>Catégorie</th><th>Article</th><th class="montant">Montant</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+    <!-- SOUS-VUE TICKETS -->
+    <div id="sous-vue-tickets" style="display:none">
+      <div class="barre-actions">
+        <span class="tot-ligne"><b id="tot-tickets">–</b> · <span id="nb-tickets">0</span> ticket(s)</span>
+        <button class="btn" onclick="ouvrirFormTicket()">+ Ticket</button>
       </div>
-      <div class="vide" id="depenses-vide" style="display:none">Aucune dépense pour ces filtres.</div>
+
+      <div class="card">
+        <div class="filtres">
+          <label>Mois
+            <select id="ft-mois" onchange="rendreTickets()"><option value="">Tous</option></select>
+          </label>
+          <label>Magasin
+            <select id="ft-magasin" onchange="rendreTickets()"><option value="">Tous</option></select>
+          </label>
+          <label class="ligne-check">
+            <input type="checkbox" id="ft-nonpointe" onchange="rendreTickets()"> Non pointés uniquement
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tableau-scroll">
+          <table id="tbl-tickets">
+            <thead>
+              <tr><th class="tk-check">✓</th><th>Date</th><th>Magasin</th><th class="montant">Total</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="vide" id="tickets-vide" style="display:none">Aucun ticket pour ces filtres.</div>
+      </div>
     </div>
   </section>
 
   <!-- VUE SYNTHÈSE -->
   <section id="vue-synthese" style="display:none">
     <div class="card">
-      <h2>Dépenses par catégorie et par mois</h2>
-      <div class="chart-box"><canvas id="chart-mois"></canvas></div>
-      <p class="note">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
+      <div class="filtre-periode" id="filtre-periode">
+        <button type="button" data-p="mois">Mois en cours</button>
+        <button type="button" data-p="annee" class="on">Année en cours</button>
+        <button type="button" data-p="perso">Période personnalisée</button>
+        <div class="perso-champs" id="perso-champs" style="display:none">
+          <label>Du <input type="date" id="p-debut"></label>
+          <label>Au <input type="date" id="p-fin"></label>
+        </div>
+      </div>
     </div>
 
     <div class="card">
-      <h2>Répartition annuelle par catégorie</h2>
-      <div class="chart-box"><canvas id="chart-annee"></canvas></div>
-      <p class="note">Part de chaque catégorie sur le total 2026, hors « Paiement fidélité ».</p>
+      <h2>Répartition par catégorie</h2>
+      <div class="pie-wrap">
+        <div class="chart-box"><canvas id="chart-annee"></canvas></div>
+        <div class="pie-legende" id="pie-legende"></div>
+      </div>
+      <p class="note" id="note-camembert">Part de chaque catégorie, hors « Paiement fidélité ».</p>
+    </div>
+
+    <div class="card">
+      <h2>Dépenses par catégorie et par mois</h2>
+      <div class="chart-box"><canvas id="chart-mois"></canvas></div>
+      <p class="note">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
     </div>
 
     <div class="card">
@@ -188,6 +273,29 @@
   </div>
 </div>
 
+<!-- MODALE TICKET -->
+<div class="overlay" id="overlay-ticket">
+  <div class="modale">
+    <h3 id="modale-ticket-titre">Ajouter un ticket</h3>
+    <div class="champ"><span>Date</span><input type="date" id="t-date"></div>
+    <div class="champ"><span>Magasin</span>
+      <input type="text" id="t-magasin" list="liste-magasins" autocomplete="off">
+    </div>
+    <div class="champ"><span>Total payé (€)</span><input type="number" id="t-total" step="0.01" inputmode="decimal"></div>
+    <div class="champ"><span>Note (facultatif)</span><input type="text" id="t-note" autocomplete="off"></div>
+    <label class="champ" style="flex-direction:row;align-items:center;gap:8px">
+      <input type="checkbox" id="t-pointe" style="width:auto"> <span style="font-size:13px;color:var(--ink)">Pointé (retrouvé sur le relevé bancaire)</span>
+    </label>
+    <div class="modale-actions">
+      <button class="btn ghost" onclick="fermerModaleTicket()">Annuler</button>
+      <button class="btn" id="t-valider" onclick="validerModaleTicket()">Enregistrer</button>
+    </div>
+    <div class="modale-actions" id="ticket-suppr" style="display:none;margin-top:8px">
+      <button class="btn danger" onclick="supprimerTicketCourant()">Supprimer ce ticket</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span id="toast-txt"></span><button id="toast-btn" style="display:none"></button></div>
 
 <script src="vendor/chart.umd.min.js"></script>
@@ -204,30 +312,46 @@ var FB_API_KEY = "AIzaSyC4ptZnhxdUEoV1FZ8rUQDBfT62cpiW128";
 var COLLECTION = "depenses";
 var BASE = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT +
            "/databases/(default)/documents/" + COLLECTION;
+var BASE_T = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT +
+             "/databases/(default)/documents/tickets";
 
 /* ------------------------------------------------------------------ *
  *  Constantes métier
  * ------------------------------------------------------------------ */
 var CATEGORIES = [
   "Protéines","Fruits et légumes","Produits secs","Conserves","Fromage/Crèmerie",
-  "Épicerie/Condiments","Plats Préparés","Café","Pain","Snacking","Dessert",
-  "Alcool","Eau","Droguerie/Hygiène","Paiement fidélité"
+  "Épicerie/Condiments","Plats Préparés","Café","Eau","Pain","Droguerie/Hygiène",
+  "Snacking","Dessert","Alcool","Paiement fidélité"
 ];
 var HORS_GRAPHIQUES = ["Paiement fidélité"];
 var COULEURS = {
-  "Protéines":"#c0603f","Fruits et légumes":"#5a9c5a","Produits secs":"#caa14a",
-  "Conserves":"#7a8fb0","Fromage/Crèmerie":"#e2c275","Épicerie/Condiments":"#9c7bb0",
-  "Plats Préparés":"#d18a5b","Café":"#6f4e37","Pain":"#d8b56b","Snacking":"#e08a9e",
-  "Dessert":"#c76d9e","Alcool":"#8f4f8f","Eau":"#5aa9c9","Droguerie/Hygiène":"#6d9a8f",
-  "Paiement fidélité":"#9aa39d"
+  "Protéines":"#bd1719","Fruits et légumes":"#6c943d","Produits secs":"#cdaa65",
+  "Conserves":"#006f93","Fromage/Crèmerie":"#f3cd37","Épicerie/Condiments":"#d1467f",
+  "Plats Préparés":"#8f8e0d","Café":"#643c19","Eau":"#74cbe5","Pain":"#ef6623",
+  "Droguerie/Hygiène":"#7dd0b4","Snacking":"#b0c6c9","Dessert":"#a170cc",
+  "Alcool":"#820932","Paiement fidélité":"#9aa39d"
 };
+/* Pastille de catégorie : fond de la couleur à 18 %, texte dans la même
+   couleur assombrie, comme dans les légendes des graphiques. */
+function stylePuce(cat){
+  var h = (COULEURS[cat] || "#9aa39d").replace("#", "");
+  var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  return "background:rgba(" + r + "," + g + "," + b + ",.18);color:rgb(" +
+         Math.round(r*.42) + "," + Math.round(g*.42) + "," + Math.round(b*.42) + ")";
+}
 
 /* ------------------------------------------------------------------ *
  *  État
  * ------------------------------------------------------------------ */
-var lignes = [];          // {id, date, magasin, categorie, article, montant, source, supprime, creeLe}
+var lignes = [];          // {id, date, magasin, categorie, article, montant, source, ticketId, supprime, creeLe}
+var tickets = [];         // {id, date, magasin, total, pointe, note, supprime, creeLe}
 var chartMois = null, chartAnnee = null;
+var periodeSynthese = "annee";   // "mois" | "annee" | "perso" — ne pilote que le camembert
+var sousVue = "detail";   // "detail" | "tickets" — onglet Dépenses
+var ticketsIndispo = false;   // true si les règles Firestore n'autorisent pas encore la collection tickets
 var idCourant = null;     // ligne en cours d'édition dans la modale
+var idTicketCourant = null;   // ticket en cours d'édition dans la modale ticket
+var ticketOuvert = null;  // id du ticket déplié dans la vue Tickets
 
 /* ------------------------------------------------------------------ *
  *  Couche Firestore (REST, sans SDK)
@@ -240,8 +364,20 @@ function versChamps(o){
     article:   {stringValue: o.article},
     montant:   {doubleValue: Number(o.montant)},
     source:    {stringValue: o.source || "manuel"},
+    ticketId:  {stringValue: o.ticketId || ""},
     supprime:  {booleanValue: !!o.supprime},
     creeLe:    {stringValue: o.creeLe || new Date().toISOString()}
+  };
+}
+function versChampsTicket(o){
+  return {
+    date:     {stringValue: o.date},
+    magasin:  {stringValue: o.magasin},
+    total:    {doubleValue: Number(o.total)},
+    pointe:   {booleanValue: !!o.pointe},
+    note:     {stringValue: o.note || ""},
+    supprime: {booleanValue: !!o.supprime},
+    creeLe:   {stringValue: o.creeLe || new Date().toISOString()}
   };
 }
 function valChamp(c){
@@ -262,6 +398,20 @@ function depuisDoc(d){
     article: valChamp(f.article) || "",
     montant: Number(valChamp(f.montant) || 0),
     source: valChamp(f.source) || "",
+    ticketId: valChamp(f.ticketId) || "",
+    supprime: valChamp(f.supprime) === true,
+    creeLe: valChamp(f.creeLe) || ""
+  };
+}
+function depuisDocTicket(d){
+  var f = d.fields || {};
+  return {
+    id: d.name.split("/").pop(),
+    date: valChamp(f.date) || "",
+    magasin: valChamp(f.magasin) || "",
+    total: Number(valChamp(f.total) || 0),
+    pointe: valChamp(f.pointe) === true,
+    note: valChamp(f.note) || "",
     supprime: valChamp(f.supprime) === true,
     creeLe: valChamp(f.creeLe) || ""
   };
@@ -285,6 +435,29 @@ function charger(){
     }
     lignes = acc.filter(function(l){ return !l.supprime; });
     banniere("");
+  }).then(function(){
+    return chargerTickets().then(function(){ ticketsIndispo = false; }).catch(function(e){
+      // collection tickets pas encore autorisée par les règles Firestore : on ne bloque pas le reste
+      ticketsIndispo = true;
+      tickets = [];
+    });
+  });
+}
+
+function chargerTickets(){
+  var acc = [];
+  function page(u){
+    return fetch(u).then(function(r){
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function(j){
+      (j.documents || []).forEach(function(d){ acc.push(depuisDocTicket(d)); });
+      if(j.nextPageToken) return page(BASE_T + "?pageSize=300&key=" + FB_API_KEY + "&pageToken=" + encodeURIComponent(j.nextPageToken));
+    });
+  }
+  return page(BASE_T + "?pageSize=300&key=" + FB_API_KEY).then(function(){
+    if(acc.length === 0 && tickets.length > 0) return;   // garde-fou
+    tickets = acc.filter(function(t){ return !t.supprime; });
   });
 }
 
@@ -298,7 +471,7 @@ function ajouter(o){
 
 function modifier(id, o){
   // updateMask obligatoire : sans lui, un PATCH remplace TOUT le document
-  var champs = ["date","magasin","categorie","article","montant","source","supprime"];
+  var champs = ["date","magasin","categorie","article","montant","source","ticketId","supprime"];
   var mask = champs.map(function(c){ return "updateMask.fieldPaths=" + c; }).join("&");
   var body = {fields:{}};
   var complet = versChamps(o);
@@ -312,6 +485,40 @@ function modifier(id, o){
 function supprimerDoux(id){
   var mask = "updateMask.fieldPaths=supprime";
   return fetch(BASE + "/" + id + "?" + mask + "&key=" + FB_API_KEY, {
+    method:"PATCH", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fields:{supprime:{booleanValue:true}}})
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+
+/* --- Tickets --- */
+function ajouterTicket(o){
+  o.creeLe = new Date().toISOString();
+  return fetch(BASE_T + "?key=" + FB_API_KEY, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fields: versChampsTicket(o)})
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function(doc){ return doc.name.split("/").pop(); });
+}
+function modifierTicket(id, o){
+  var champs = ["date","magasin","total","pointe","note","supprime"];
+  var mask = champs.map(function(c){ return "updateMask.fieldPaths=" + c; }).join("&");
+  var body = {fields:{}}, complet = versChampsTicket(o);
+  champs.forEach(function(c){ body.fields[c] = complet[c]; });
+  return fetch(BASE_T + "/" + id + "?" + mask + "&key=" + FB_API_KEY, {
+    method:"PATCH", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body)
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+function pointerTicket(id, val){
+  var mask = "updateMask.fieldPaths=pointe";
+  return fetch(BASE_T + "/" + id + "?" + mask + "&key=" + FB_API_KEY, {
+    method:"PATCH", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fields:{pointe:{booleanValue:!!val}}})
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+function supprimerTicketDoux(id){
+  var mask = "updateMask.fieldPaths=supprime";
+  return fetch(BASE_T + "/" + id + "?" + mask + "&key=" + FB_API_KEY, {
     method:"PATCH", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({fields:{supprime:{booleanValue:true}}})
   }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
@@ -361,9 +568,16 @@ function remplirFiltres(){
   majSelect("f-magasin", magDispo, "Tous", null);
   majSelect("f-cat", catDispo, "Toutes", null);
 
-  // datalist magasins pour la modale
+  // filtres de la sous-vue Tickets (domaines dérivés des tickets)
+  var moisTk = uniques(tickets.map(function(t){ return moisDe(t.date); })).sort().reverse();
+  var magTk  = uniques(tickets.map(function(t){ return t.magasin; })).sort(function(a,b){ return a.localeCompare(b,"fr"); });
+  majSelect("ft-mois", moisTk, "Tous", moisLisible);
+  majSelect("ft-magasin", magTk, "Tous", null);
+
+  // datalist magasins pour les modales (union lignes + tickets)
+  var magTous = uniques(magDispo.concat(magTk)).sort(function(a,b){ return a.localeCompare(b,"fr"); });
   var dl = document.getElementById("liste-magasins");
-  dl.innerHTML = magDispo.map(function(m){ return "<option value=\"" + echap(m) + "\">"; }).join("");
+  dl.innerHTML = magTous.map(function(m){ return "<option value=\"" + echap(m) + "\">"; }).join("");
 }
 function majSelect(id, valeurs, labelTous, transfo){
   var s = document.getElementById(id), garde = s.value;
@@ -400,7 +614,7 @@ function rendreDepenses(){
     return "<tr class=\"modifiable\" data-id=\"" + l.id + "\">" +
       "<td>" + fmtDate(l.date) + "</td>" +
       "<td>" + echap(l.magasin) + "</td>" +
-      "<td><span class=\"puce\">" + echap(l.categorie) + "</span></td>" +
+      "<td><span class=\"puce\" style=\"" + stylePuce(l.categorie) + "\">" + echap(l.categorie) + "</span></td>" +
       "<td>" + echap(l.article) + "</td>" +
       "<td class=\"montant" + neg + "\">" + euros(l.montant) + "</td>" +
     "</tr>";
@@ -417,6 +631,185 @@ function rendreDepenses(){
 function fmtDate(s){
   var p = (s || "").split("-");
   return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : s;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Sous-vue Tickets (onglet Dépenses)
+ * ------------------------------------------------------------------ */
+function montrerSousVue(v){
+  sousVue = v === "tickets" ? "tickets" : "detail";
+  var tk = sousVue === "tickets";
+  document.getElementById("sous-vue-detail").style.display = tk ? "none" : "";
+  document.getElementById("sous-vue-tickets").style.display = tk ? "" : "none";
+  document.getElementById("sous-tab-detail").classList.toggle("actif", !tk);
+  document.getElementById("sous-tab-tickets").classList.toggle("actif", tk);
+  if(tk) rendreTickets();
+}
+
+function ticketsFiltres(){
+  var fm = document.getElementById("ft-mois").value;
+  var fg = document.getElementById("ft-magasin").value;
+  var nonPointe = document.getElementById("ft-nonpointe").checked;
+  return tickets.filter(function(t){
+    if(fm && moisDe(t.date) !== fm) return false;
+    if(fg && t.magasin !== fg) return false;
+    if(nonPointe && t.pointe) return false;
+    return true;
+  }).sort(function(a,b){
+    if(a.date !== b.date) return a.date < b.date ? 1 : -1;   // plus récent d'abord
+    return a.magasin.localeCompare(b.magasin, "fr");
+  });
+}
+
+function rendreTickets(){
+  var tb = document.querySelector("#tbl-tickets tbody");
+  if(ticketsIndispo){
+    tb.innerHTML = "";
+    document.getElementById("tbl-tickets").style.display = "none";
+    var v = document.getElementById("tickets-vide");
+    v.style.display = "block";
+    v.textContent = "La collection « tickets » n'est pas encore autorisée côté Firestore. Ajoute la règle et recharge la page.";
+    document.getElementById("tot-tickets").textContent = "–";
+    document.getElementById("nb-tickets").textContent = "0";
+    return;
+  }
+  var f = ticketsFiltres();
+  tb.innerHTML = f.map(function(t){
+    var lignesTk = lignes.filter(function(l){ return l.ticketId === t.id; })
+      .sort(function(a,b){ return a.article.localeCompare(b.article, "fr"); });
+    var ouvert = ticketOuvert === t.id;
+    var rangee =
+      "<tr class=\"tk-ligne" + (t.pointe ? " tk-pointe" : "") + (ouvert ? " ouvert" : "") + "\" data-id=\"" + t.id + "\">" +
+        "<td class=\"tk-check\"><input type=\"checkbox\" data-pointe=\"" + t.id + "\"" + (t.pointe ? " checked" : "") + "></td>" +
+        "<td>" + fmtDate(t.date) + "</td>" +
+        "<td>" + echap(t.magasin) + (t.note ? " <span class=\"note\" style=\"margin:0\">· " + echap(t.note) + "</span>" : "") + "</td>" +
+        "<td class=\"montant\">" + euros(t.total) + "</td>" +
+      "</tr>";
+    if(ouvert){
+      var corps = lignesTk.length
+        ? lignesTk.map(function(l){
+            return "<tr><td><span class=\"puce\" style=\"" + stylePuce(l.categorie) + "\">" + echap(l.categorie) + "</span></td>" +
+              "<td>" + echap(l.article) + "</td>" +
+              "<td class=\"montant" + (l.montant < 0 ? " neg" : "") + "\">" + euros(l.montant) + "</td></tr>";
+          }).join("")
+        : "<tr><td colspan=\"3\" class=\"vide\" style=\"padding:14px\">Aucune ligne rattachée à ce ticket.</td></tr>";
+      var sommeTk = lignesTk.reduce(function(s,l){ return s + l.montant; }, 0);
+      rangee += "<tr class=\"tk-detail\"><td colspan=\"4\"><table><tbody>" + corps +
+        "<tr><td></td><td style=\"text-align:right;color:var(--ink-soft)\">Somme des lignes</td>" +
+        "<td class=\"montant\" style=\"color:var(--ink-soft)\">" + euros(sommeTk) + "</td></tr>" +
+        "<tr><td colspan=\"3\" style=\"text-align:right\">" +
+        "<button class=\"btn ghost\" data-edit-ticket=\"" + t.id + "\" style=\"font-size:12.5px;padding:6px 10px\">Modifier ce ticket</button></td></tr>" +
+        "</tbody></table></td></tr>";
+    }
+    return rangee;
+  }).join("");
+
+  Array.prototype.forEach.call(tb.querySelectorAll("input[data-pointe]"), function(cb){
+    cb.addEventListener("click", function(e){ e.stopPropagation(); });
+    cb.addEventListener("change", function(){ basculerPointe(cb.getAttribute("data-pointe"), cb.checked); });
+  });
+  Array.prototype.forEach.call(tb.querySelectorAll("tr.tk-ligne"), function(tr){
+    tr.addEventListener("click", function(){
+      var id = tr.getAttribute("data-id");
+      ticketOuvert = ticketOuvert === id ? null : id;
+      rendreTickets();
+    });
+  });
+  Array.prototype.forEach.call(tb.querySelectorAll("[data-edit-ticket]"), function(b){
+    b.addEventListener("click", function(e){ e.stopPropagation(); ouvrirFormTicketModif(b.getAttribute("data-edit-ticket")); });
+  });
+
+  document.getElementById("tbl-tickets").style.display = f.length ? "" : "none";
+  document.getElementById("tickets-vide").style.display = f.length ? "none" : "block";
+  var total = f.reduce(function(s,t){ return s + t.total; }, 0);
+  document.getElementById("tot-tickets").textContent = euros(total);
+  document.getElementById("nb-tickets").textContent = f.length;
+}
+
+function basculerPointe(id, val){
+  var t = tickets.filter(function(x){ return x.id === id; })[0];
+  if(t) t.pointe = !!val;   // optimiste
+  rendreTickets();
+  pointerTicket(id, val).catch(function(e){
+    if(t) t.pointe = !val;
+    rendreTickets();
+    banniere("Échec de l'enregistrement du pointage : " + e.message);
+  });
+}
+
+/* Modale ticket */
+function ouvrirFormTicket(){
+  if(ticketsIndispo){ toast("Collection « tickets » pas encore autorisée côté Firestore."); return; }
+  idTicketCourant = null;
+  document.getElementById("modale-ticket-titre").textContent = "Ajouter un ticket";
+  document.getElementById("t-date").value = aujourdHui();
+  document.getElementById("t-magasin").value = "";
+  document.getElementById("t-total").value = "";
+  document.getElementById("t-note").value = "";
+  document.getElementById("t-pointe").checked = false;
+  document.getElementById("ticket-suppr").style.display = "none";
+  document.getElementById("overlay-ticket").classList.add("on");
+  document.getElementById("t-magasin").focus();
+}
+function ouvrirFormTicketModif(id){
+  var t = tickets.filter(function(x){ return x.id === id; })[0];
+  if(!t) return;
+  idTicketCourant = id;
+  document.getElementById("modale-ticket-titre").textContent = "Modifier le ticket";
+  document.getElementById("t-date").value = t.date;
+  document.getElementById("t-magasin").value = t.magasin;
+  document.getElementById("t-total").value = t.total;
+  document.getElementById("t-note").value = t.note;
+  document.getElementById("t-pointe").checked = t.pointe;
+  document.getElementById("ticket-suppr").style.display = "flex";
+  document.getElementById("overlay-ticket").classList.add("on");
+}
+function fermerModaleTicket(){
+  document.getElementById("overlay-ticket").classList.remove("on");
+  idTicketCourant = null;
+}
+function lireModaleTicket(){
+  return {
+    date: document.getElementById("t-date").value,
+    magasin: document.getElementById("t-magasin").value.trim(),
+    total: parseFloat(document.getElementById("t-total").value.replace(",", ".")),
+    note: document.getElementById("t-note").value.trim(),
+    pointe: document.getElementById("t-pointe").checked
+  };
+}
+function validerModaleTicket(){
+  var o = lireModaleTicket();
+  if(!o.date){ toast("Il manque la date."); return; }
+  if(!o.magasin){ toast("Il manque le magasin."); return; }
+  if(isNaN(o.total)){ toast("Total invalide."); return; }
+  var btn = document.getElementById("t-valider");
+  btn.disabled = true; btn.textContent = "…";
+  var p = idTicketCourant ? modifierTicket(idTicketCourant, o) : ajouterTicket(o);
+  p.then(charger).then(function(){
+    fermerModaleTicket();
+    remplirFiltres(); rendreTickets();
+    toast(idTicketCourant ? "Ticket modifié." : "Ticket ajouté.");
+  }).catch(function(e){
+    banniere("Échec de l'enregistrement : " + e.message);
+  }).then(function(){
+    btn.disabled = false; btn.textContent = "Enregistrer";
+  });
+}
+function supprimerTicketCourant(){
+  if(!idTicketCourant) return;
+  var lignesTk = lignes.filter(function(l){ return l.ticketId === idTicketCourant; }).length;
+  var msg = lignesTk
+    ? "Supprimer ce ticket ? Ses " + lignesTk + " ligne(s) restent dans le suivi mais ne seront plus rattachées à un ticket."
+    : "Supprimer ce ticket ?";
+  if(!confirm(msg)) return;
+  supprimerTicketDoux(idTicketCourant).then(charger).then(function(){
+    ticketOuvert = null;
+    fermerModaleTicket();
+    remplirFiltres(); rendreTickets();
+    toast("Ticket supprimé.");
+  }).catch(function(e){
+    banniere("Échec de la suppression : " + e.message);
+  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -443,7 +836,7 @@ function rendreSynthese(){
   var nClos = moisClos.length;
 
   rendreChartMois(a);
-  rendreChartAnnee(a);
+  rendreChartAnnee();
   rendreBilan(a, moisClos, nClos);
 
   var note = document.getElementById("note-bilan");
@@ -495,13 +888,42 @@ function rendreChartMois(a){
   else chartMois = new Chart(document.getElementById("chart-mois"), {type:"bar", data:data, options:opt});
 }
 
-function rendreChartAnnee(a){
+function lignesPeriode(){
+  if(periodeSynthese === "mois"){
+    var mc = moisCourant();
+    return lignes.filter(function(l){ return moisDe(l.date) === mc; });
+  }
+  if(periodeSynthese === "annee"){
+    var an = String(new Date().getFullYear());
+    return lignes.filter(function(l){ return (l.date || "").slice(0,4) === an; });
+  }
+  var d = document.getElementById("p-debut").value;
+  var f = document.getElementById("p-fin").value;
+  return lignes.filter(function(l){
+    var x = l.date || "";
+    return (!d || x >= d) && (!f || x <= f);
+  });
+}
+function libellePeriode(){
+  if(periodeSynthese === "mois") return moisLisible(moisCourant());
+  if(periodeSynthese === "annee") return "l'année " + new Date().getFullYear();
+  var d = document.getElementById("p-debut").value, f = document.getElementById("p-fin").value;
+  if(d && f) return "la période du " + fmtDate(d) + " au " + fmtDate(f);
+  if(d) return "la période depuis le " + fmtDate(d);
+  if(f) return "la période jusqu'au " + fmtDate(f);
+  return "toute la période";
+}
+
+function rendreChartAnnee(){
   var cats = catsGraphiques();
-  var totaux = cats.map(function(c){
-    return a.moisSet.reduce(function(s,m){ return s + Math.max(0, a.parMoisCat[m][c] || 0); }, 0);
+  var tot = {};
+  cats.forEach(function(c){ tot[c] = 0; });
+  lignesPeriode().forEach(function(l){
+    if(tot[l.categorie] === undefined) return;
+    if(l.montant > 0) tot[l.categorie] += l.montant;
   });
   var garde = [];
-  cats.forEach(function(c,i){ if(totaux[i] > 0) garde.push({c:c, v:totaux[i]}); });
+  cats.forEach(function(c){ if(tot[c] > 0) garde.push({c:c, v:tot[c]}); });
   garde.sort(function(x,y){ return y.v - x.v; });
   var grandTotal = garde.reduce(function(s,g){ return s + g.v; }, 0);
   var data = {
@@ -515,7 +937,7 @@ function rendreChartAnnee(a){
   var opt = {
     responsive:true, maintainAspectRatio:false, cutout:"55%",
     plugins:{
-      legend:{position:"bottom", labels:{boxWidth:12, font:{size:11}}},
+      legend:{display:false},
       tooltip:{callbacks:{ label:function(ctx){
         var pct = grandTotal ? Math.round(ctx.parsed / grandTotal * 100) : 0;
         return ctx.label + " : " + euros(ctx.parsed) + " (" + pct + " %)";
@@ -524,6 +946,20 @@ function rendreChartAnnee(a){
   };
   if(chartAnnee){ chartAnnee.data = data; chartAnnee.options = opt; chartAnnee.update(); }
   else chartAnnee = new Chart(document.getElementById("chart-annee"), {type:"doughnut", data:data, options:opt});
+
+  var leg = document.getElementById("pie-legende");
+  if(!garde.length){
+    leg.innerHTML = "<p class=\"note\" style=\"margin:0\">Aucune dépense sur cette période.</p>";
+  } else {
+    leg.innerHTML = garde.map(function(g){
+      var pct = grandTotal ? Math.round(g.v / grandTotal * 100) : 0;
+      return "<div class=\"lg-row\"><span class=\"lg-sw\" style=\"background:" + (COULEURS[g.c] || "#bbb") + "\"></span>" +
+        "<span>" + echap(g.c) + "</span>" +
+        "<span class=\"lg-val\">" + euros(g.v) + " · " + pct + " %</span></div>";
+    }).join("");
+  }
+  document.getElementById("note-camembert").textContent =
+    "Part de chaque catégorie sur " + libellePeriode() + ", hors « Paiement fidélité ».";
 }
 
 function rendreBilan(a, moisClos, nClos){
@@ -602,17 +1038,25 @@ function validerModale(){
   btn.disabled = true; btn.textContent = "…";
   var p;
   if(idCourant){
-    o.source = (lignes.filter(function(x){ return x.id === idCourant; })[0] || {}).source || "manuel";
+    var actu = lignes.filter(function(x){ return x.id === idCourant; })[0] || {};
+    o.source = actu.source || "manuel";
+    o.ticketId = actu.ticketId || "";
     p = modifier(idCourant, o);
   } else {
     o.source = "manuel";
-    p = ajouter(o);
+    if(ticketsIndispo){
+      p = ajouter(o);   // pas de collection tickets : on garde l'ancien comportement
+    } else {
+      // une dépense saisie à la main = un ticket à elle seule
+      p = ajouterTicket({date:o.date, magasin:o.magasin, total:o.montant, pointe:false})
+        .then(function(tid){ o.ticketId = tid; return ajouter(o); });
+    }
   }
   p.then(function(){
     return charger();
   }).then(function(){
     fermerModale();
-    remplirFiltres(); rendreDepenses(); rendreSynthese();
+    remplirFiltres(); rendreDepenses(); rendreSynthese(); rendreTickets();
     toast(idCourant ? "Ligne modifiée." : "Dépense ajoutée.");
   }).catch(function(e){
     banniere("Échec de l'enregistrement : " + e.message);
@@ -627,7 +1071,7 @@ function supprimerCourant(){
     return charger();
   }).then(function(){
     fermerModale();
-    remplirFiltres(); rendreDepenses(); rendreSynthese();
+    remplirFiltres(); rendreDepenses(); rendreSynthese(); rendreTickets();
     toast("Ligne supprimée.");
   }).catch(function(e){
     banniere("Échec de la suppression : " + e.message);
@@ -644,21 +1088,52 @@ function montrerVue(v){
   document.getElementById("tab-depenses").classList.toggle("actif", dep);
   document.getElementById("tab-synthese").classList.toggle("actif", !dep);
   if(!dep) rendreSynthese();
+  else if(sousVue === "tickets") rendreTickets();
 }
 
 /* ------------------------------------------------------------------ *
  *  Démarrage
  * ------------------------------------------------------------------ */
 window.montrerVue = montrerVue;
+window.montrerSousVue = montrerSousVue;
 window.ouvrirFormAjout = ouvrirFormAjout;
 window.fermerModale = fermerModale;
 window.validerModale = validerModale;
 window.supprimerCourant = supprimerCourant;
 window.rendreDepenses = rendreDepenses;
+window.rendreTickets = rendreTickets;
+window.ouvrirFormTicket = ouvrirFormTicket;
+window.fermerModaleTicket = fermerModaleTicket;
+window.validerModaleTicket = validerModaleTicket;
+window.supprimerTicketCourant = supprimerTicketCourant;
 
 document.getElementById("overlay").addEventListener("click", function(e){
   if(e.target === this) fermerModale();
 });
+document.getElementById("overlay-ticket").addEventListener("click", function(e){
+  if(e.target === this) fermerModaleTicket();
+});
+
+/* Filtre de période du camembert (Synthèse) */
+(function(){
+  var an = new Date().getFullYear();
+  document.getElementById("p-debut").value = an + "-01-01";
+  document.getElementById("p-fin").value = aujourdHui();
+  var btns = document.querySelectorAll("#filtre-periode button");
+  Array.prototype.forEach.call(btns, function(b){
+    b.addEventListener("click", function(){
+      periodeSynthese = b.getAttribute("data-p");
+      Array.prototype.forEach.call(btns, function(x){ x.classList.toggle("on", x === b); });
+      document.getElementById("perso-champs").style.display = periodeSynthese === "perso" ? "flex" : "none";
+      rendreChartAnnee();
+    });
+  });
+  ["p-debut","p-fin"].forEach(function(id){
+    document.getElementById(id).addEventListener("change", function(){
+      if(periodeSynthese === "perso") rendreChartAnnee();
+    });
+  });
+})();
 
 peuplerSelectCat();
 banniere("Chargement…");
@@ -666,6 +1141,7 @@ charger().then(function(){
   banniere("");
   remplirFiltres();
   rendreDepenses();
+  rendreTickets();
 }).catch(function(e){
   banniere("Impossible de charger les données (" + e.message + "). Vérifie la connexion et recharge la page.");
 });

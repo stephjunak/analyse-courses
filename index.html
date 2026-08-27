@@ -87,6 +87,8 @@
   .pie-legende .lg-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink)}
   .pie-legende .lg-sw{width:12px;height:12px;border-radius:3px;flex:none}
   .pie-legende .lg-val{margin-left:auto;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pie-legende .lg-total{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-weight:700;color:var(--ink);padding-bottom:7px;border-bottom:1px solid var(--line);margin-bottom:2px}
+  .pie-legende .lg-total span{font-variant-numeric:tabular-nums}
   /* modale */
   .overlay{position:fixed;inset:0;background:rgba(20,24,22,.42);display:none;align-items:flex-end;justify-content:center;z-index:50}
   .overlay.on{display:flex}
@@ -95,6 +97,8 @@
   .modale h3{margin:0 0 14px;font-size:16px}
   .champ{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}
   .champ span{font-size:11.5px;color:var(--ink-soft)}
+  .champ input:disabled{background:var(--bg);color:var(--ink-soft);cursor:not-allowed}
+  .champ .indice{font-size:11px;color:var(--ink-soft);font-style:italic}
   .modale-actions{display:flex;gap:8px;margin-top:6px}
   .modale-actions .btn{flex:1}
   .banniere{background:#fdeeea;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:none}
@@ -127,12 +131,12 @@
   <div class="banniere" id="banniere"></div>
 
   <div class="tabs">
-    <button id="tab-depenses" class="actif" onclick="montrerVue('depenses')">Dépenses</button>
-    <button id="tab-synthese" onclick="montrerVue('synthese')">Synthèse</button>
+    <button id="tab-depenses" onclick="montrerVue('depenses')">Dépenses</button>
+    <button id="tab-synthese" class="actif" onclick="montrerVue('synthese')">Synthèse</button>
   </div>
 
   <!-- VUE DÉPENSES -->
-  <section id="vue-depenses">
+  <section id="vue-depenses" style="display:none">
     <div class="tabs sous-tabs">
       <button id="sous-tab-detail" class="actif" onclick="montrerSousVue('detail')">Détail</button>
       <button id="sous-tab-tickets" onclick="montrerSousVue('tickets')">Tickets</button>
@@ -208,11 +212,11 @@
   </section>
 
   <!-- VUE SYNTHÈSE -->
-  <section id="vue-synthese" style="display:none">
+  <section id="vue-synthese">
     <div class="card">
       <div class="filtre-periode" id="filtre-periode">
-        <button type="button" data-p="mois">Mois en cours</button>
-        <button type="button" data-p="annee" class="on">Année en cours</button>
+        <button type="button" data-p="mois" class="on">Mois en cours</button>
+        <button type="button" data-p="annee">Année en cours</button>
         <button type="button" data-p="perso">Période personnalisée</button>
         <div class="perso-champs" id="perso-champs" style="display:none">
           <label>Du <input type="date" id="p-debut"></label>
@@ -255,7 +259,9 @@
 <div class="overlay" id="overlay">
   <div class="modale">
     <h3 id="modale-titre">Ajouter une dépense</h3>
-    <div class="champ"><span>Date</span><input type="date" id="m-date"></div>
+    <div class="champ"><span>Date</span><input type="date" id="m-date">
+      <span class="indice" id="m-date-indice" style="display:none">La date se modifie sur le ticket (onglet Dépenses &gt; Tickets).</span>
+    </div>
     <div class="champ"><span>Magasin</span>
       <input type="text" id="m-magasin" list="liste-magasins" autocomplete="off">
       <datalist id="liste-magasins"></datalist>
@@ -346,7 +352,7 @@ function stylePuce(cat){
 var lignes = [];          // {id, date, magasin, categorie, article, montant, source, ticketId, supprime, creeLe}
 var tickets = [];         // {id, date, magasin, total, pointe, note, supprime, creeLe}
 var chartMois = null, chartAnnee = null;
-var periodeSynthese = "annee";   // "mois" | "annee" | "perso" — ne pilote que le camembert
+var periodeSynthese = "mois";    // "mois" | "annee" | "perso" — ne pilote que le camembert
 var sousVue = "detail";   // "detail" | "tickets" — onglet Dépenses
 var ticketsIndispo = false;   // true si les règles Firestore n'autorisent pas encore la collection tickets
 var idCourant = null;     // ligne en cours d'édition dans la modale
@@ -784,10 +790,28 @@ function validerModaleTicket(){
   if(isNaN(o.total)){ toast("Total invalide."); return; }
   var btn = document.getElementById("t-valider");
   btn.disabled = true; btn.textContent = "…";
-  var p = idTicketCourant ? modifierTicket(idTicketCourant, o) : ajouterTicket(o);
+  var p;
+  if(idTicketCourant){
+    var ancien = tickets.filter(function(x){ return x.id === idTicketCourant; })[0] || {};
+    var bougeDate = o.date !== ancien.date;
+    var bougeMag  = o.magasin !== ancien.magasin;
+    // la date et le magasin vivent sur le ticket : on les répercute sur ses lignes
+    var majLignes = (bougeDate || bougeMag)
+      ? lignes.filter(function(l){ return l.ticketId === idTicketCourant; }).map(function(l){
+          return modifier(l.id, {
+            date: o.date, magasin: o.magasin,
+            categorie: l.categorie, article: l.article, montant: l.montant,
+            source: l.source, ticketId: l.ticketId, supprime: l.supprime
+          });
+        })
+      : [];
+    p = modifierTicket(idTicketCourant, o).then(function(){ return Promise.all(majLignes); });
+  } else {
+    p = ajouterTicket(o);
+  }
   p.then(charger).then(function(){
     fermerModaleTicket();
-    remplirFiltres(); rendreTickets();
+    remplirFiltres(); rendreTickets(); rendreDepenses(); rendreSynthese();
     toast(idTicketCourant ? "Ticket modifié." : "Ticket ajouté.");
   }).catch(function(e){
     banniere("Échec de l'enregistrement : " + e.message);
@@ -951,7 +975,9 @@ function rendreChartAnnee(){
   if(!garde.length){
     leg.innerHTML = "<p class=\"note\" style=\"margin:0\">Aucune dépense sur cette période.</p>";
   } else {
-    leg.innerHTML = garde.map(function(g){
+    leg.innerHTML =
+      "<div class=\"lg-total\"><span>Total</span><span>" + euros(grandTotal) + "</span></div>" +
+      garde.map(function(g){
       var pct = grandTotal ? Math.round(g.v / grandTotal * 100) : 0;
       return "<div class=\"lg-row\"><span class=\"lg-sw\" style=\"background:" + (COULEURS[g.c] || "#bbb") + "\"></span>" +
         "<span>" + echap(g.c) + "</span>" +
@@ -993,6 +1019,8 @@ function ouvrirFormAjout(){
   idCourant = null;
   document.getElementById("modale-titre").textContent = "Ajouter une dépense";
   document.getElementById("m-date").value = aujourdHui();
+  document.getElementById("m-date").disabled = false;
+  document.getElementById("m-date-indice").style.display = "none";
   document.getElementById("m-magasin").value = "";
   document.getElementById("m-cat").value = "Fruits et légumes";
   document.getElementById("m-article").value = "";
@@ -1007,6 +1035,8 @@ function ouvrirFormModif(id){
   idCourant = id;
   document.getElementById("modale-titre").textContent = "Modifier la dépense";
   document.getElementById("m-date").value = l.date;
+  document.getElementById("m-date").disabled = true;
+  document.getElementById("m-date-indice").style.display = "";
   document.getElementById("m-magasin").value = l.magasin;
   document.getElementById("m-cat").value = l.categorie;
   document.getElementById("m-article").value = l.article;
@@ -1036,6 +1066,7 @@ function validerModale(){
 
   var btn = document.getElementById("m-valider");
   btn.disabled = true; btn.textContent = "…";
+  var etaitModif = !!idCourant;
   var p;
   if(idCourant){
     var actu = lignes.filter(function(x){ return x.id === idCourant; })[0] || {};
@@ -1057,7 +1088,7 @@ function validerModale(){
   }).then(function(){
     fermerModale();
     remplirFiltres(); rendreDepenses(); rendreSynthese(); rendreTickets();
-    toast(idCourant ? "Ligne modifiée." : "Dépense ajoutée.");
+    toast(etaitModif ? "Ligne modifiée." : "Dépense ajoutée.");
   }).catch(function(e){
     banniere("Échec de l'enregistrement : " + e.message);
   }).then(function(){
@@ -1142,6 +1173,7 @@ charger().then(function(){
   remplirFiltres();
   rendreDepenses();
   rendreTickets();
+  rendreSynthese();
 }).catch(function(e){
   banniere("Impossible de charger les données (" + e.message + "). Vérifie la connexion et recharge la page.");
 });

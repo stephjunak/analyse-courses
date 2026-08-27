@@ -3,57 +3,85 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#5c4f3f">
+<meta name="theme-color" content="#f7f8fa">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Analyse courses</title>
 <style>
   :root{
-    --bg:#f4f2ec;
+    --bg:#f7f8fa;
     --card:#ffffff;
-    --ink:#1f2421;
-    --ink-soft:#5b635d;
-    --line:#e2ded3;
-    --accent:#5c4f3f;
-    --accent-soft:#ede6d7;
+    --ink:#1a2233;
+    --ink-soft:rgba(26,34,51,.60);
+    --ink-pct:rgba(26,34,51,.64);
+    --ink-tert:rgba(26,34,51,.50);
+    --line:rgba(26,34,51,.08);
+    --line-strong:rgba(26,34,51,.16);
+    --accent:oklch(0.34 0.075 262);
+    --accent-soft:rgba(43,53,87,.07);
     --danger:#a8412f;
-    --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+    --shadow:0 1px 2px rgba(26,34,51,.04);
+    --f-serif:ui-serif,"New York",Georgia,"Times New Roman",serif;
+    --f-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --f-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --r-card:16px;
+    --r-pill:99px;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
   body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-family:var(--f-sans);
     background:var(--bg);color:var(--ink);
     -webkit-font-smoothing:antialiased;
+    accent-color:var(--accent);
     padding:0 0 env(safe-area-inset-bottom);
   }
-  header{
-    background:var(--accent);color:#fff;
-    padding:14px 16px calc(14px + env(safe-area-inset-top));
-    padding-top:max(14px,env(safe-area-inset-top));
+  select:focus-visible,input:focus-visible,button:focus-visible{
+    outline:2px solid var(--accent);outline-offset:1px;
   }
-  header h1{margin:0;font-size:18px;font-weight:650;letter-spacing:.2px}
-  header .sous{margin:2px 0 0;font-size:12.5px;opacity:.82}
+  header{
+    background:var(--bg);
+    border-bottom:1px solid rgba(26,34,51,.09);
+    padding:16px;
+    padding-top:max(16px,env(safe-area-inset-top));
+  }
+  .entete{
+    max-width:920px;margin:0 auto;
+    display:flex;justify-content:space-between;align-items:flex-start;gap:14px 20px;flex-wrap:wrap;
+  }
+  .entete-titre h1{
+    margin:0;font-family:var(--f-serif);font-weight:400;
+    font-size:clamp(24px,6vw,30px);line-height:1;color:var(--ink);
+  }
+  .entete-titre .sous{margin:6px 0 0;font-size:12.5px;color:var(--ink-soft)}
+  .onglets-vue{display:flex;gap:6px;flex:none}
+  .onglets-vue button{
+    font:inherit;font-size:12.5px;font-weight:500;
+    padding:8px 16px;border-radius:var(--r-pill);
+    border:1px solid var(--line-strong);background:var(--card);
+    color:var(--ink-tert);cursor:pointer;
+  }
+  .onglets-vue button.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
   .wrap{max-width:920px;margin:0 auto;padding:16px}
-  .tabs{display:flex;gap:6px;margin:-6px 0 16px}
+  .tabs{display:flex;gap:6px;margin:0 0 16px}
   .tabs button{
-    flex:1;padding:10px 12px;border:1px solid var(--line);background:var(--card);
-    border-radius:10px;font-size:14px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+    padding:7px 16px;border:1px solid var(--line-strong);background:var(--card);
+    border-radius:var(--r-pill);font:inherit;font-size:12.5px;font-weight:500;color:var(--ink-tert);cursor:pointer;
   }
   .tabs button.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px;margin-bottom:14px}
-  .card h2{margin:0 0 10px;font-size:14px;font-weight:650;color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow);padding:16px;margin-bottom:14px}
+  .card h2{margin:0 0 12px;font-size:15px;font-weight:600;color:var(--ink)}
   .filtres{display:flex;flex-wrap:wrap;gap:8px}
   .filtres label{display:flex;flex-direction:column;font-size:11px;color:var(--ink-soft);gap:3px;flex:1;min-width:120px}
   select,input[type=text],input[type=number],input[type=date]{
     font:inherit;font-size:14px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;
   }
   .btn{
-    font:inherit;font-size:14px;font-weight:600;padding:9px 14px;border-radius:9px;border:1px solid var(--accent);
+    font:inherit;font-size:13.5px;font-weight:500;padding:9px 16px;border-radius:10px;border:1px solid var(--accent);
     background:var(--accent);color:#fff;cursor:pointer;
   }
   .btn.sec{background:#fff;color:var(--accent)}
-  .btn.ghost{background:#fff;color:var(--ink-soft);border-color:var(--line)}
+  .btn.ghost{background:#fff;color:var(--ink-soft);border-color:var(--line-strong)}
   .btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
   .barre-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
   .tot-ligne{font-size:13px;color:var(--ink-soft)}
@@ -63,6 +91,7 @@
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
   th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);font-weight:600}
   td.montant,th.montant{text-align:right;font-variant-numeric:tabular-nums}
+  td.montant{font-family:var(--f-mono);font-size:12.5px}
   td.neg{color:var(--danger)}
   tr.modifiable{cursor:pointer}
   tr.modifiable:hover{background:var(--accent-soft)}
@@ -72,23 +101,32 @@
   .bilan td.montant{font-variant-numeric:tabular-nums}
   .bilan tr.total td{font-weight:700;border-top:2px solid var(--line)}
   .note{font-size:12px;color:var(--ink-soft);margin:8px 0 0}
-  .filtre-periode{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}
+  .filtre-periode{display:flex;flex-wrap:wrap;gap:2px 18px;align-items:center}
   .filtre-periode button{
-    padding:7px 12px;border:1px solid var(--line);background:#fff;border-radius:999px;
-    font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+    padding:6px 1px;border:none;background:none;border-bottom:2px solid transparent;border-radius:0;
+    font:inherit;font-size:12.5px;font-weight:500;color:var(--ink-tert);cursor:pointer;
   }
-  .filtre-periode button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .perso-champs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;width:100%}
+  .filtre-periode button.on{color:var(--ink);border-bottom-color:var(--accent)}
+  .periode-plage{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--ink-soft);white-space:nowrap}
+  @media(max-width:560px){
+    .periode-plage{margin-left:0;flex-basis:100%;margin-top:3px}
+  }
+  .ligne-nonalim{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12.5px;color:var(--ink);cursor:pointer}
+  .ligne-nonalim input{width:16px;height:16px;flex:none;cursor:pointer}
+  .perso-champs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;width:100%}
   .perso-champs label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ink-soft)}
   .perso-champs input{width:auto}
-  .pie-wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
-  .pie-wrap .chart-box{flex:1 1 260px;min-width:220px}
-  .pie-legende{flex:1 1 200px;min-width:180px;display:flex;flex-direction:column;gap:5px}
-  .pie-legende .lg-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink)}
-  .pie-legende .lg-sw{width:12px;height:12px;border-radius:3px;flex:none}
-  .pie-legende .lg-val{margin-left:auto;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
-  .pie-legende .lg-total{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;font-weight:700;color:var(--ink);padding-bottom:7px;border-bottom:1px solid var(--line);margin-bottom:2px}
-  .pie-legende .lg-total span{font-variant-numeric:tabular-nums}
+  .pie-wrap{display:flex;gap:24px;flex-wrap:wrap;align-items:center}
+  .donut-box{position:relative;flex:1 1 300px;min-width:240px;height:360px}
+  .donut-centre{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center}
+  .donut-centre .dc-label{font-family:var(--f-sans);font-weight:500;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft)}
+  .donut-centre .dc-val{font-family:var(--f-serif);font-weight:400;font-size:clamp(22px,5vw,30px);line-height:1.25;color:var(--ink)}
+  .pie-legende{flex:1 1 240px;min-width:200px;display:flex;flex-direction:column;gap:7px}
+  .pie-legende .lg-row{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--ink)}
+  .pie-legende .lg-sw{width:11px;height:11px;border-radius:3px;flex:none}
+  .pie-legende .lg-nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pie-legende .lg-val{font-family:var(--f-mono);font-size:12px;color:var(--ink);white-space:nowrap;text-align:right}
+  .pie-legende .lg-pct{font-family:var(--f-mono);font-size:12px;color:var(--ink-pct);width:4ch;text-align:right;flex:none}
   /* modale */
   .overlay{position:fixed;inset:0;background:rgba(20,24,22,.42);display:none;align-items:flex-end;justify-content:center;z-index:50}
   .overlay.on{display:flex}
@@ -123,17 +161,20 @@
 </head>
 <body>
 <header>
-  <h1>Analyse courses</h1>
-  <p class="sous">Dépenses de courses par magasin, catégorie et mois</p>
+  <div class="entete">
+    <div class="entete-titre">
+      <h1>Analyse courses</h1>
+      <p class="sous">Dépenses par magasin, catégorie et mois</p>
+    </div>
+    <div class="onglets-vue">
+      <button id="tab-depenses" onclick="montrerVue('depenses')">Dépenses</button>
+      <button id="tab-synthese" class="actif" onclick="montrerVue('synthese')">Synthèse</button>
+    </div>
+  </div>
 </header>
 
 <div class="wrap">
   <div class="banniere" id="banniere"></div>
-
-  <div class="tabs">
-    <button id="tab-depenses" onclick="montrerVue('depenses')">Dépenses</button>
-    <button id="tab-synthese" class="actif" onclick="montrerVue('synthese')">Synthèse</button>
-  </div>
 
   <!-- VUE DÉPENSES -->
   <section id="vue-depenses" style="display:none">
@@ -218,17 +259,20 @@
         <button type="button" data-p="mois" class="on">Mois en cours</button>
         <button type="button" data-p="annee">Année en cours</button>
         <button type="button" data-p="perso">Période personnalisée</button>
-        <div class="perso-champs" id="perso-champs" style="display:none">
-          <label>Du <input type="date" id="p-debut"></label>
-          <label>Au <input type="date" id="p-fin"></label>
-        </div>
+        <span class="periode-plage" id="periode-plage"></span>
       </div>
-    </div>
-
-    <div class="card">
-      <h2>Répartition par catégorie</h2>
-      <div class="pie-wrap">
-        <div class="chart-box"><canvas id="chart-annee"></canvas></div>
+      <div class="perso-champs" id="perso-champs" style="display:none">
+        <label>Du <input type="date" id="p-debut"></label>
+        <label>Au <input type="date" id="p-fin"></label>
+      </div>
+      <label class="ligne-nonalim">
+        <input type="checkbox" id="f-nonalim"> Exclure le non alimentaire
+      </label>
+      <div class="pie-wrap" style="margin-top:16px">
+        <div class="donut-box">
+          <canvas id="chart-annee"></canvas>
+          <div class="donut-centre"><span class="dc-label">Total</span><span class="dc-val" id="donut-total">—</span></div>
+        </div>
         <div class="pie-legende" id="pie-legende"></div>
       </div>
       <p class="note" id="note-camembert">Part de chaque catégorie, hors « Paiement fidélité ».</p>
@@ -237,7 +281,7 @@
     <div class="card">
       <h2>Dépenses par catégorie et par mois</h2>
       <div class="chart-box"><canvas id="chart-mois"></canvas></div>
-      <p class="note">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
+      <p class="note" id="note-histo">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
     </div>
 
     <div class="card">
@@ -245,7 +289,7 @@
       <div class="tableau-scroll">
         <table class="bilan" id="tbl-bilan">
           <thead>
-            <tr><th>Catégorie</th><th class="montant">Total 2026</th><th class="montant">Moyenne mensuelle</th></tr>
+            <tr><th>Catégorie</th><th class="montant">Total 2026</th><th class="montant">Moyenne mensuelle</th><th class="montant">Moyenne journalière</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -330,20 +374,34 @@ var CATEGORIES = [
   "Snacking","Dessert","Alcool","Paiement fidélité"
 ];
 var HORS_GRAPHIQUES = ["Paiement fidélité"];
+var NON_ALIMENTAIRE = ["Droguerie/Hygiène"];
+/* Palette « design-system.md » (option 6a), en oklch pour un contraste perçu
+   régulier d'une teinte à l'autre. « Épicerie/Condiments » porte la couleur
+   « Condiments » du nuancier ; « Dessert » (absente du nuancier) reçoit un
+   framboise distinct ; « Paiement fidélité » reste neutre et hors graphiques. */
 var COULEURS = {
-  "Protéines":"#bd1719","Fruits et légumes":"#6c943d","Produits secs":"#cdaa65",
-  "Conserves":"#006f93","Fromage/Crèmerie":"#f3cd37","Épicerie/Condiments":"#d1467f",
-  "Plats Préparés":"#8f8e0d","Café":"#643c19","Eau":"#74cbe5","Pain":"#ef6623",
-  "Droguerie/Hygiène":"#7dd0b4","Snacking":"#b0c6c9","Dessert":"#a170cc",
-  "Alcool":"#820932","Paiement fidélité":"#9aa39d"
+  "Protéines":          "oklch(0.52 0.15 355)",
+  "Fruits et légumes":  "oklch(0.58 0.13 145)",
+  "Produits secs":      "oklch(0.75 0.05 75)",
+  "Conserves":          "oklch(0.52 0.08 225)",
+  "Fromage/Crèmerie":   "oklch(0.83 0.13 92)",
+  "Épicerie/Condiments":"oklch(0.62 0.13 45)",
+  "Plats Préparés":     "oklch(0.55 0.09 300)",
+  "Café":               "oklch(0.40 0.06 55)",
+  "Eau":                "oklch(0.78 0.10 245)",
+  "Pain":               "oklch(0.68 0.10 65)",
+  "Droguerie/Hygiène":  "oklch(0.75 0.07 190)",
+  "Snacking":           "oklch(0.70 0.11 30)",
+  "Dessert":            "oklch(0.72 0.13 340)",
+  "Alcool":             "oklch(0.42 0.11 15)",
+  "Paiement fidélité":  "oklch(0.72 0.012 260)"
 };
-/* Pastille de catégorie : fond de la couleur à 18 %, texte dans la même
-   couleur assombrie, comme dans les légendes des graphiques. */
+/* Pastille de catégorie : la couleur mélangée à du blanc pour le fond, à
+   l'encre principale pour le texte (color-mix gère les valeurs oklch). */
 function stylePuce(cat){
-  var h = (COULEURS[cat] || "#9aa39d").replace("#", "");
-  var r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
-  return "background:rgba(" + r + "," + g + "," + b + ",.18);color:rgb(" +
-         Math.round(r*.42) + "," + Math.round(g*.42) + "," + Math.round(b*.42) + ")";
+  var c = COULEURS[cat] || "#9aa39d";
+  return "background:color-mix(in srgb," + c + " 15%, #fff);" +
+         "color:color-mix(in srgb," + c + " 72%, #1a2233)";
 }
 
 /* ------------------------------------------------------------------ *
@@ -353,6 +411,7 @@ var lignes = [];          // {id, date, magasin, categorie, article, montant, so
 var tickets = [];         // {id, date, magasin, total, pointe, note, supprime, creeLe}
 var chartMois = null, chartAnnee = null;
 var periodeSynthese = "mois";    // "mois" | "annee" | "perso" — ne pilote que le camembert
+var exclureNonAlim = false;      // case « Exclure le non alimentaire » (Synthèse, non mémorisée)
 var sousVue = "detail";   // "detail" | "tickets" — onglet Dépenses
 var ticketsIndispo = false;   // true si les règles Firestore n'autorisent pas encore la collection tickets
 var idCourant = null;     // ligne en cours d'édition dans la modale
@@ -864,16 +923,41 @@ function rendreSynthese(){
   rendreBilan(a, moisClos, nClos);
 
   var note = document.getElementById("note-bilan");
+  var prefixe = exclureNonAlim ? "Non alimentaire exclu (« " + NON_ALIMENTAIRE.join(" », « ") + " »). " : "";
+  var jourNote = " Moyenne journalière : total divisé par le nombre de jours écoulés depuis la première dépense (mois en cours inclus).";
   if(nClos === 0){
-    note.textContent = "Aucun mois clos pour l'instant (le mois en cours ne compte pas). La moyenne mensuelle apparaîtra quand un mois complet sera passé.";
+    note.textContent = prefixe + "Aucun mois clos pour l'instant (le mois en cours ne compte pas). La moyenne mensuelle apparaîtra quand un mois complet sera passé." + jourNote;
   } else {
-    note.textContent = "Moyenne calculée sur " + nClos + " mois clos (" +
-      moisClos.map(moisLisible).join(", ") + "). Le mois en cours n'est jamais compté.";
+    note.textContent = prefixe + "Moyenne mensuelle calculée sur " + nClos + " mois clos (" +
+      moisClos.map(moisLisible).join(", ") + "). Le mois en cours n'est jamais compté." + jourNote;
   }
 }
 
 function catsGraphiques(){
-  return CATEGORIES.filter(function(c){ return HORS_GRAPHIQUES.indexOf(c) === -1; });
+  return CATEGORIES.filter(function(c){
+    if(HORS_GRAPHIQUES.indexOf(c) !== -1) return false;
+    if(exclureNonAlim && NON_ALIMENTAIRE.indexOf(c) !== -1) return false;
+    return true;
+  });
+}
+function suffixeExclusion(){
+  return exclureNonAlim ? " et « " + NON_ALIMENTAIRE.join(" », « ") + " »" : "";
+}
+function texteePlage(){
+  function jm(s){ var p = (s || "").split("-"); return p.length === 3 ? p[2] + "." + p[1] : ""; }
+  function jma(s){ var p = (s || "").split("-"); return p.length === 3 ? p[2] + "." + p[1] + "." + p[0] : ""; }
+  if(periodeSynthese === "mois"){
+    var m = String(new Date().getMonth()+1).padStart(2,"0");
+    return "01." + m + " → " + jma(aujourdHui());
+  }
+  if(periodeSynthese === "annee"){
+    return "01.01 → " + jma(aujourdHui());
+  }
+  var a = document.getElementById("p-debut").value, b = document.getElementById("p-fin").value;
+  if(a && b) return jm(a) + " → " + jma(b);
+  if(a) return "depuis le " + jma(a);
+  if(b) return "jusqu'au " + jma(b);
+  return "";
 }
 
 function rendreChartMois(a){
@@ -910,6 +994,9 @@ function rendreChartMois(a){
   };
   if(chartMois){ chartMois.data = data; chartMois.options = opt; chartMois.update(); }
   else chartMois = new Chart(document.getElementById("chart-mois"), {type:"bar", data:data, options:opt});
+
+  document.getElementById("note-histo").textContent =
+    "Hors « Paiement fidélité » (ce n'est pas une dépense)" + suffixeExclusion() + ".";
 }
 
 function lignesPeriode(){
@@ -947,8 +1034,7 @@ function rendreChartAnnee(){
     if(l.montant > 0) tot[l.categorie] += l.montant;
   });
   var garde = [];
-  cats.forEach(function(c){ if(tot[c] > 0) garde.push({c:c, v:tot[c]}); });
-  garde.sort(function(x,y){ return y.v - x.v; });
+  cats.forEach(function(c){ if(tot[c] > 0) garde.push({c:c, v:tot[c]}); });   // ordre fixe des catégories, non nulles
   var grandTotal = garde.reduce(function(s,g){ return s + g.v; }, 0);
   var data = {
     labels: garde.map(function(g){ return g.c; }),
@@ -959,7 +1045,7 @@ function rendreChartAnnee(){
     }]
   };
   var opt = {
-    responsive:true, maintainAspectRatio:false, cutout:"55%",
+    responsive:true, maintainAspectRatio:false, cutout:"64%",
     plugins:{
       legend:{display:false},
       tooltip:{callbacks:{ label:function(ctx){
@@ -972,26 +1058,46 @@ function rendreChartAnnee(){
   else chartAnnee = new Chart(document.getElementById("chart-annee"), {type:"doughnut", data:data, options:opt});
 
   var leg = document.getElementById("pie-legende");
+  var dt = document.getElementById("donut-total");
   if(!garde.length){
     leg.innerHTML = "<p class=\"note\" style=\"margin:0\">Aucune dépense sur cette période.</p>";
+    if(dt) dt.textContent = euros(0);
   } else {
-    leg.innerHTML =
-      "<div class=\"lg-total\"><span>Total</span><span>" + euros(grandTotal) + "</span></div>" +
-      garde.map(function(g){
+    leg.innerHTML = garde.map(function(g){
       var pct = grandTotal ? Math.round(g.v / grandTotal * 100) : 0;
-      return "<div class=\"lg-row\"><span class=\"lg-sw\" style=\"background:" + (COULEURS[g.c] || "#bbb") + "\"></span>" +
-        "<span>" + echap(g.c) + "</span>" +
-        "<span class=\"lg-val\">" + euros(g.v) + " · " + pct + " %</span></div>";
+      return "<div class=\"lg-row\">" +
+        "<span class=\"lg-sw\" style=\"background:" + (COULEURS[g.c] || "#bbb") + "\"></span>" +
+        "<span class=\"lg-nom\">" + echap(g.c) + "</span>" +
+        "<span class=\"lg-val\">" + euros(g.v) + "</span>" +
+        "<span class=\"lg-pct\">" + pct + " %</span></div>";
     }).join("");
+    if(dt) dt.textContent = euros(grandTotal);
   }
+  var pp = document.getElementById("periode-plage");
+  if(pp) pp.textContent = texteePlage();
   document.getElementById("note-camembert").textContent =
-    "Part de chaque catégorie sur " + libellePeriode() + ", hors « Paiement fidélité ».";
+    "Part de chaque catégorie sur " + libellePeriode() + ", hors « Paiement fidélité »" + suffixeExclusion() + ".";
 }
 
 function rendreBilan(a, moisClos, nClos){
   var tb = document.querySelector("#tbl-bilan tbody");
   var totalAnnee = 0, moyTotale = 0;
+
+  // Fenêtre en jours pour la moyenne journalière : de la 1re à la dernière
+  // dépense enregistrée, mois en cours inclus, même périmètre que le tableau.
+  var datesActives = lignes.filter(function(l){
+    if(exclureNonAlim && NON_ALIMENTAIRE.indexOf(l.categorie) !== -1) return false;
+    return !!l.date;
+  }).map(function(l){ return l.date; }).sort();
+  var jours = 0;
+  if(datesActives.length){
+    var d1 = new Date(datesActives[0] + "T00:00:00");
+    var d2 = new Date(datesActives[datesActives.length - 1] + "T00:00:00");
+    jours = Math.round((d2 - d1) / 86400000) + 1;
+  }
+
   var html = CATEGORIES.filter(function(c){
+    if(exclureNonAlim && NON_ALIMENTAIRE.indexOf(c) !== -1) return false;
     return a.moisSet.some(function(m){ return (a.parMoisCat[m][c] || 0) !== 0; });
   }).map(function(c){
     var tot = a.moisSet.reduce(function(s,m){ return s + (a.parMoisCat[m][c] || 0); }, 0);
@@ -1000,11 +1106,13 @@ function rendreBilan(a, moisClos, nClos){
     if(moy !== null) moyTotale += moy;
     return "<tr><td>" + echap(c) + "</td>" +
       "<td class=\"montant\">" + euros(tot) + "</td>" +
-      "<td class=\"montant\">" + (moy === null ? "—" : euros(moy)) + "</td></tr>";
+      "<td class=\"montant\">" + (moy === null ? "—" : euros(moy)) + "</td>" +
+      "<td class=\"montant\">" + (jours ? euros(tot / jours) : "—") + "</td></tr>";
   }).join("");
   html += "<tr class=\"total\"><td>Total</td>" +
     "<td class=\"montant\">" + euros(totalAnnee) + "</td>" +
-    "<td class=\"montant\">" + (nClos ? euros(moyTotale) : "—") + "</td></tr>";
+    "<td class=\"montant\">" + (nClos ? euros(moyTotale) : "—") + "</td>" +
+    "<td class=\"montant\">" + (jours ? euros(totalAnnee / jours) : "—") + "</td></tr>";
   tb.innerHTML = html;
 }
 
@@ -1163,6 +1271,10 @@ document.getElementById("overlay-ticket").addEventListener("click", function(e){
     document.getElementById(id).addEventListener("change", function(){
       if(periodeSynthese === "perso") rendreChartAnnee();
     });
+  });
+  document.getElementById("f-nonalim").addEventListener("change", function(){
+    exclureNonAlim = this.checked;   // non mémorisé : repart décoché à chaque ouverture
+    rendreSynthese();
   });
 })();
 

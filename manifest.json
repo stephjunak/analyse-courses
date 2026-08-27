@@ -1,0 +1,12 @@
+{
+  "name": "Analyse courses",
+  "short_name": "Courses",
+  "description": "Suivi des dépenses de courses par magasin, catégorie et mois",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f2ec",
+  "theme_color": "#2f6b4f",
+  "icons": [
+    { "src": "icon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ]
+}

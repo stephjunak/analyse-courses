@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f6b4f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Analyse courses</title>
+<style>
+  :root{
+    --bg:#f4f2ec;
+    --card:#ffffff;
+    --ink:#1f2421;
+    --ink-soft:#5b635d;
+    --line:#e2ded3;
+    --accent:#2f6b4f;
+    --accent-soft:#e6efe9;
+    --danger:#a8412f;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+    padding:0 0 env(safe-area-inset-bottom);
+  }
+  header{
+    background:var(--accent);color:#fff;
+    padding:14px 16px calc(14px + env(safe-area-inset-top));
+    padding-top:max(14px,env(safe-area-inset-top));
+  }
+  header h1{margin:0;font-size:18px;font-weight:650;letter-spacing:.2px}
+  header .sous{margin:2px 0 0;font-size:12.5px;opacity:.82}
+  .wrap{max-width:920px;margin:0 auto;padding:16px}
+  .tabs{display:flex;gap:6px;margin:-6px 0 16px}
+  .tabs button{
+    flex:1;padding:10px 12px;border:1px solid var(--line);background:var(--card);
+    border-radius:10px;font-size:14px;font-weight:600;color:var(--ink-soft);cursor:pointer;
+  }
+  .tabs button.actif{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px;margin-bottom:14px}
+  .card h2{margin:0 0 10px;font-size:14px;font-weight:650;color:var(--ink)}
+  .filtres{display:flex;flex-wrap:wrap;gap:8px}
+  .filtres label{display:flex;flex-direction:column;font-size:11px;color:var(--ink-soft);gap:3px;flex:1;min-width:120px}
+  select,input[type=text],input[type=number],input[type=date]{
+    font:inherit;font-size:14px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;
+  }
+  .btn{
+    font:inherit;font-size:14px;font-weight:600;padding:9px 14px;border-radius:9px;border:1px solid var(--accent);
+    background:var(--accent);color:#fff;cursor:pointer;
+  }
+  .btn.sec{background:#fff;color:var(--accent)}
+  .btn.ghost{background:#fff;color:var(--ink-soft);border-color:var(--line)}
+  .btn.danger{background:#fff;color:var(--danger);border-color:var(--danger)}
+  .barre-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .tot-ligne{font-size:13px;color:var(--ink-soft)}
+  .tot-ligne b{color:var(--ink);font-size:15px}
+  .tableau-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);font-weight:600}
+  td.montant,th.montant{text-align:right;font-variant-numeric:tabular-nums}
+  td.neg{color:var(--danger)}
+  tr.modifiable{cursor:pointer}
+  tr.modifiable:hover{background:var(--accent-soft)}
+  .puce{display:inline-block;padding:2px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-size:11.5px;font-weight:600}
+  .vide{color:var(--ink-soft);font-size:13.5px;text-align:center;padding:26px 10px}
+  .chart-box{position:relative;height:300px}
+  .bilan td.montant{font-variant-numeric:tabular-nums}
+  .bilan tr.total td{font-weight:700;border-top:2px solid var(--line)}
+  .note{font-size:12px;color:var(--ink-soft);margin:8px 0 0}
+  /* modale */
+  .overlay{position:fixed;inset:0;background:rgba(20,24,22,.42);display:none;align-items:flex-end;justify-content:center;z-index:50}
+  .overlay.on{display:flex}
+  .modale{background:#fff;width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));max-height:92vh;overflow-y:auto}
+  @media(min-width:560px){.overlay{align-items:center}.modale{border-radius:16px}}
+  .modale h3{margin:0 0 14px;font-size:16px}
+  .champ{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}
+  .champ span{font-size:11.5px;color:var(--ink-soft)}
+  .modale-actions{display:flex;gap:8px;margin-top:6px}
+  .modale-actions .btn{flex:1}
+  .banniere{background:#fdeeea;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:none}
+  .banniere.on{display:block}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;display:none;align-items:center;gap:12px;z-index:60}
+  .toast.on{display:flex}
+  .toast button{background:none;border:none;color:#8fd0b0;font:inherit;font-weight:700;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>Analyse courses</h1>
+  <p class="sous">Dépenses de courses par magasin, catégorie et mois</p>
+</header>
+
+<div class="wrap">
+  <div class="banniere" id="banniere"></div>
+
+  <div class="tabs">
+    <button id="tab-depenses" class="actif" onclick="montrerVue('depenses')">Dépenses</button>
+    <button id="tab-synthese" onclick="montrerVue('synthese')">Synthèse</button>
+  </div>
+
+  <!-- VUE DÉPENSES -->
+  <section id="vue-depenses">
+    <div class="barre-actions">
+      <span class="tot-ligne">Filtré : <b id="tot-filtre">–</b> · <span id="nb-filtre">0</span> ligne(s)</span>
+      <button class="btn" onclick="ouvrirFormAjout()">+ Ajouter</button>
+    </div>
+
+    <div class="card">
+      <div class="filtres">
+        <label>Mois
+          <select id="f-mois" onchange="rendreDepenses()"><option value="">Tous</option></select>
+        </label>
+        <label>Magasin
+          <select id="f-magasin" onchange="rendreDepenses()"><option value="">Tous</option></select>
+        </label>
+        <label>Catégorie
+          <select id="f-cat" onchange="rendreDepenses()"><option value="">Toutes</option></select>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tableau-scroll">
+        <table id="tbl-depenses">
+          <thead>
+            <tr><th>Date</th><th>Magasin</th><th>Catégorie</th><th>Article</th><th class="montant">Montant</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="vide" id="depenses-vide" style="display:none">Aucune dépense pour ces filtres.</div>
+    </div>
+  </section>
+
+  <!-- VUE SYNTHÈSE -->
+  <section id="vue-synthese" style="display:none">
+    <div class="card">
+      <h2>Dépenses par catégorie et par mois</h2>
+      <div class="chart-box"><canvas id="chart-mois"></canvas></div>
+      <p class="note">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
+    </div>
+
+    <div class="card">
+      <h2>Répartition annuelle par catégorie</h2>
+      <div class="chart-box"><canvas id="chart-annee"></canvas></div>
+      <p class="note">Part de chaque catégorie sur le total 2026, hors « Paiement fidélité ».</p>
+    </div>
+
+    <div class="card">
+      <h2>Bilan annuel 2026</h2>
+      <div class="tableau-scroll">
+        <table class="bilan" id="tbl-bilan">
+          <thead>
+            <tr><th>Catégorie</th><th class="montant">Total 2026</th><th class="montant">Moyenne mensuelle</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="note" id="note-bilan"></p>
+    </div>
+  </section>
+</div>
+
+<!-- MODALE AJOUT / MODIF -->
+<div class="overlay" id="overlay">
+  <div class="modale">
+    <h3 id="modale-titre">Ajouter une dépense</h3>
+    <div class="champ"><span>Date</span><input type="date" id="m-date"></div>
+    <div class="champ"><span>Magasin</span>
+      <input type="text" id="m-magasin" list="liste-magasins" autocomplete="off">
+      <datalist id="liste-magasins"></datalist>
+    </div>
+    <div class="champ"><span>Catégorie</span><select id="m-cat"></select></div>
+    <div class="champ"><span>Article</span><input type="text" id="m-article" autocomplete="off"></div>
+    <div class="champ"><span>Montant (€) — négatif pour un paiement fidélité</span><input type="number" id="m-montant" step="0.01" inputmode="decimal"></div>
+    <div class="modale-actions">
+      <button class="btn ghost" onclick="fermerModale()">Annuler</button>
+      <button class="btn" id="m-valider" onclick="validerModale()">Enregistrer</button>
+    </div>
+    <div class="modale-actions" id="ligne-suppr" style="display:none;margin-top:8px">
+      <button class="btn danger" onclick="supprimerCourant()">Supprimer cette ligne</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toast-txt"></span><button id="toast-btn" style="display:none"></button></div>
+
+<script src="vendor/chart.umd.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ------------------------------------------------------------------ *
+ *  Configuration Firebase (l'apiKey web n'est pas un secret :
+ *  c'est la règle de sécurité Firestore qui protège la base).
+ * ------------------------------------------------------------------ */
+var FB_PROJECT = "analyse-courses-5580f";
+var FB_API_KEY = "AIzaSyC4ptZnhxdUEoV1FZ8rUQDBfT62cpiW128";
+var COLLECTION = "depenses";
+var BASE = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT +
+           "/databases/(default)/documents/" + COLLECTION;
+
+/* ------------------------------------------------------------------ *
+ *  Constantes métier
+ * ------------------------------------------------------------------ */
+var CATEGORIES = [
+  "Protéines","Fruits et légumes","Produits secs","Conserves","Fromage/Crèmerie",
+  "Épicerie/Condiments","Plats Préparés","Café","Pain","Snacking","Dessert",
+  "Alcool","Eau","Droguerie/Hygiène","Paiement fidélité"
+];
+var HORS_GRAPHIQUES = ["Paiement fidélité"];
+var COULEURS = {
+  "Protéines":"#c0603f","Fruits et légumes":"#5a9c5a","Produits secs":"#caa14a",
+  "Conserves":"#7a8fb0","Fromage/Crèmerie":"#e2c275","Épicerie/Condiments":"#9c7bb0",
+  "Plats Préparés":"#d18a5b","Café":"#6f4e37","Pain":"#d8b56b","Snacking":"#e08a9e",
+  "Dessert":"#c76d9e","Alcool":"#8f4f8f","Eau":"#5aa9c9","Droguerie/Hygiène":"#6d9a8f",
+  "Paiement fidélité":"#9aa39d"
+};
+
+/* ------------------------------------------------------------------ *
+ *  État
+ * ------------------------------------------------------------------ */
+var lignes = [];          // {id, date, magasin, categorie, article, montant, source, supprime, creeLe}
+var chartMois = null, chartAnnee = null;
+var idCourant = null;     // ligne en cours d'édition dans la modale
+
+/* ------------------------------------------------------------------ *
+ *  Couche Firestore (REST, sans SDK)
+ * ------------------------------------------------------------------ */
+function versChamps(o){
+  return {
+    date:      {stringValue: o.date},
+    magasin:   {stringValue: o.magasin},
+    categorie: {stringValue: o.categorie},
+    article:   {stringValue: o.article},
+    montant:   {doubleValue: Number(o.montant)},
+    source:    {stringValue: o.source || "manuel"},
+    supprime:  {booleanValue: !!o.supprime},
+    creeLe:    {stringValue: o.creeLe || new Date().toISOString()}
+  };
+}
+function valChamp(c){
+  if(!c) return null;
+  if("stringValue"  in c) return c.stringValue;
+  if("doubleValue"  in c) return Number(c.doubleValue);
+  if("integerValue" in c) return Number(c.integerValue);
+  if("booleanValue" in c) return c.booleanValue;
+  return null;
+}
+function depuisDoc(d){
+  var f = d.fields || {};
+  return {
+    id: d.name.split("/").pop(),
+    date: valChamp(f.date) || "",
+    magasin: valChamp(f.magasin) || "",
+    categorie: valChamp(f.categorie) || "",
+    article: valChamp(f.article) || "",
+    montant: Number(valChamp(f.montant) || 0),
+    source: valChamp(f.source) || "",
+    supprime: valChamp(f.supprime) === true,
+    creeLe: valChamp(f.creeLe) || ""
+  };
+}
+
+function charger(){
+  var acc = [], url = BASE + "?pageSize=300&key=" + FB_API_KEY;
+  function page(u){
+    return fetch(u).then(function(r){
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function(j){
+      (j.documents || []).forEach(function(d){ acc.push(depuisDoc(d)); });
+      if(j.nextPageToken) return page(BASE + "?pageSize=300&key=" + FB_API_KEY + "&pageToken=" + encodeURIComponent(j.nextPageToken));
+    });
+  }
+  return page(url).then(function(){
+    // garde-fou : une réponse vide ne remplace jamais un affichage déjà rempli
+    if(acc.length === 0 && lignes.length > 0){
+      throw new Error("réponse vide ignorée");
+    }
+    lignes = acc.filter(function(l){ return !l.supprime; });
+    banniere("");
+  });
+}
+
+function ajouter(o){
+  o.creeLe = new Date().toISOString();
+  return fetch(BASE + "?key=" + FB_API_KEY, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fields: versChamps(o)})
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+
+function modifier(id, o){
+  // updateMask obligatoire : sans lui, un PATCH remplace TOUT le document
+  var champs = ["date","magasin","categorie","article","montant","source","supprime"];
+  var mask = champs.map(function(c){ return "updateMask.fieldPaths=" + c; }).join("&");
+  var body = {fields:{}};
+  var complet = versChamps(o);
+  champs.forEach(function(c){ body.fields[c] = complet[c]; });
+  return fetch(BASE + "/" + id + "?" + mask + "&key=" + FB_API_KEY, {
+    method:"PATCH", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body)
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+
+function supprimerDoux(id){
+  var mask = "updateMask.fieldPaths=supprime";
+  return fetch(BASE + "/" + id + "?" + mask + "&key=" + FB_API_KEY, {
+    method:"PATCH", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fields:{supprime:{booleanValue:true}}})
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+
+/* ------------------------------------------------------------------ *
+ *  Utilitaires
+ * ------------------------------------------------------------------ */
+function euros(n){
+  return (Number(n) || 0).toLocaleString("fr-FR",{minimumFractionDigits:2,maximumFractionDigits:2}) + " €";
+}
+function moisDe(dateStr){ return (dateStr || "").slice(0,7); }   // "2026-08"
+function moisLisible(k){
+  var mois = ["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
+  var p = k.split("-"); return mois[Number(p[1])-1] + " " + p[0];
+}
+function moisCourant(){
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+}
+function aujourdHui(){
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function uniques(arr){ return arr.filter(function(v,i){ return arr.indexOf(v) === i; }); }
+function banniere(msg){
+  var b = document.getElementById("banniere");
+  b.textContent = msg; b.classList.toggle("on", !!msg);
+}
+function toast(txt){
+  var t = document.getElementById("toast");
+  document.getElementById("toast-txt").textContent = txt;
+  document.getElementById("toast-btn").style.display = "none";
+  t.classList.add("on");
+  clearTimeout(toast._t); toast._t = setTimeout(function(){ t.classList.remove("on"); }, 2600);
+}
+
+/* ------------------------------------------------------------------ *
+ *  Vue Dépenses
+ * ------------------------------------------------------------------ */
+function remplirFiltres(){
+  var moisDispo = uniques(lignes.map(function(l){ return moisDe(l.date); })).sort().reverse();
+  var magDispo  = uniques(lignes.map(function(l){ return l.magasin; })).sort(function(a,b){ return a.localeCompare(b,"fr"); });
+  var catDispo  = CATEGORIES.filter(function(c){ return lignes.some(function(l){ return l.categorie === c; }); });
+
+  majSelect("f-mois", moisDispo, "Tous", moisLisible);
+  majSelect("f-magasin", magDispo, "Tous", null);
+  majSelect("f-cat", catDispo, "Toutes", null);
+
+  // datalist magasins pour la modale
+  var dl = document.getElementById("liste-magasins");
+  dl.innerHTML = magDispo.map(function(m){ return "<option value=\"" + echap(m) + "\">"; }).join("");
+}
+function majSelect(id, valeurs, labelTous, transfo){
+  var s = document.getElementById(id), garde = s.value;
+  s.innerHTML = "<option value=\"\">" + labelTous + "</option>" +
+    valeurs.map(function(v){
+      return "<option value=\"" + echap(v) + "\">" + echap(transfo ? transfo(v) : v) + "</option>";
+    }).join("");
+  if(valeurs.indexOf(garde) !== -1) s.value = garde;
+}
+function echap(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function lignesFiltrees(){
+  var fm = document.getElementById("f-mois").value;
+  var fg = document.getElementById("f-magasin").value;
+  var fc = document.getElementById("f-cat").value;
+  return lignes.filter(function(l){
+    if(fm && moisDe(l.date) !== fm) return false;
+    if(fg && l.magasin !== fg) return false;
+    if(fc && l.categorie !== fc) return false;
+    return true;
+  }).sort(function(a,b){
+    if(a.date !== b.date) return a.date < b.date ? 1 : -1;   // plus récent d'abord
+    return (a.magasin + a.article).localeCompare(b.magasin + b.article, "fr");
+  });
+}
+
+function rendreDepenses(){
+  var f = lignesFiltrees();
+  var tb = document.querySelector("#tbl-depenses tbody");
+  tb.innerHTML = f.map(function(l){
+    var neg = l.montant < 0 ? " neg" : "";
+    return "<tr class=\"modifiable\" data-id=\"" + l.id + "\">" +
+      "<td>" + fmtDate(l.date) + "</td>" +
+      "<td>" + echap(l.magasin) + "</td>" +
+      "<td><span class=\"puce\">" + echap(l.categorie) + "</span></td>" +
+      "<td>" + echap(l.article) + "</td>" +
+      "<td class=\"montant" + neg + "\">" + euros(l.montant) + "</td>" +
+    "</tr>";
+  }).join("");
+  Array.prototype.forEach.call(tb.querySelectorAll("tr"), function(tr){
+    tr.addEventListener("click", function(){ ouvrirFormModif(tr.getAttribute("data-id")); });
+  });
+  document.getElementById("tbl-depenses").style.display = f.length ? "" : "none";
+  document.getElementById("depenses-vide").style.display = f.length ? "none" : "block";
+  var total = f.reduce(function(s,l){ return s + l.montant; }, 0);
+  document.getElementById("tot-filtre").textContent = euros(total);
+  document.getElementById("nb-filtre").textContent = f.length;
+}
+function fmtDate(s){
+  var p = (s || "").split("-");
+  return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : s;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Vue Synthèse
+ * ------------------------------------------------------------------ */
+function agregats(){
+  var moisSet = uniques(lignes.map(function(l){ return moisDe(l.date); })).sort();
+  var parMoisCat = {};   // parMoisCat[mois][cat] = somme
+  var totMois = {};      // totMois[mois] = somme toutes catégories
+  moisSet.forEach(function(m){ parMoisCat[m] = {}; totMois[m] = 0; });
+  lignes.forEach(function(l){
+    var m = moisDe(l.date);
+    if(!parMoisCat[m]) return;
+    parMoisCat[m][l.categorie] = (parMoisCat[m][l.categorie] || 0) + l.montant;
+    totMois[m] += l.montant;
+  });
+  return {moisSet:moisSet, parMoisCat:parMoisCat, totMois:totMois};
+}
+
+function rendreSynthese(){
+  var a = agregats();
+  var mc = moisCourant();
+  var moisClos = a.moisSet.filter(function(m){ return m < mc && a.totMois[m] > 0; });
+  var nClos = moisClos.length;
+
+  rendreChartMois(a);
+  rendreChartAnnee(a);
+  rendreBilan(a, moisClos, nClos);
+
+  var note = document.getElementById("note-bilan");
+  if(nClos === 0){
+    note.textContent = "Aucun mois clos pour l'instant (le mois en cours ne compte pas). La moyenne mensuelle apparaîtra quand un mois complet sera passé.";
+  } else {
+    note.textContent = "Moyenne calculée sur " + nClos + " mois clos (" +
+      moisClos.map(moisLisible).join(", ") + "). Le mois en cours n'est jamais compté.";
+  }
+}
+
+function catsGraphiques(){
+  return CATEGORIES.filter(function(c){ return HORS_GRAPHIQUES.indexOf(c) === -1; });
+}
+
+function rendreChartMois(a){
+  var cats = catsGraphiques().filter(function(c){
+    return a.moisSet.some(function(m){ return (a.parMoisCat[m][c] || 0) > 0; });
+  });
+  var data = {
+    labels: a.moisSet.map(moisLisible),
+    datasets: cats.map(function(c){
+      return {
+        label: c,
+        data: a.moisSet.map(function(m){ return Math.max(0, a.parMoisCat[m][c] || 0); }),
+        backgroundColor: COULEURS[c] || "#bbb"
+      };
+    })
+  };
+  var opt = {
+    responsive:true, maintainAspectRatio:false,
+    scales:{ x:{stacked:true}, y:{stacked:true, ticks:{callback:function(v){ return v + " €"; }}} },
+    plugins:{
+      legend:{position:"bottom", labels:{boxWidth:12, font:{size:11}}},
+      tooltip:{callbacks:{
+        label:function(ctx){
+          var tot = ctx.chart.data.datasets.reduce(function(s,d){ return s + (d.data[ctx.dataIndex] || 0); }, 0);
+          var pct = tot ? Math.round(ctx.parsed.y / tot * 100) : 0;
+          return ctx.dataset.label + " : " + euros(ctx.parsed.y) + " (" + pct + " %)";
+        },
+        footer:function(items){
+          var tot = items.reduce(function(s,i){ return s + i.parsed.y; }, 0);
+          return "Total mois : " + euros(tot);
+        }
+      }}
+    }
+  };
+  if(chartMois){ chartMois.data = data; chartMois.options = opt; chartMois.update(); }
+  else chartMois = new Chart(document.getElementById("chart-mois"), {type:"bar", data:data, options:opt});
+}
+
+function rendreChartAnnee(a){
+  var cats = catsGraphiques();
+  var totaux = cats.map(function(c){
+    return a.moisSet.reduce(function(s,m){ return s + Math.max(0, a.parMoisCat[m][c] || 0); }, 0);
+  });
+  var garde = [];
+  cats.forEach(function(c,i){ if(totaux[i] > 0) garde.push({c:c, v:totaux[i]}); });
+  garde.sort(function(x,y){ return y.v - x.v; });
+  var grandTotal = garde.reduce(function(s,g){ return s + g.v; }, 0);
+  var data = {
+    labels: garde.map(function(g){ return g.c; }),
+    datasets:[{
+      data: garde.map(function(g){ return g.v; }),
+      backgroundColor: garde.map(function(g){ return COULEURS[g.c] || "#bbb"; }),
+      borderWidth:1, borderColor:"#fff"
+    }]
+  };
+  var opt = {
+    responsive:true, maintainAspectRatio:false, cutout:"55%",
+    plugins:{
+      legend:{position:"bottom", labels:{boxWidth:12, font:{size:11}}},
+      tooltip:{callbacks:{ label:function(ctx){
+        var pct = grandTotal ? Math.round(ctx.parsed / grandTotal * 100) : 0;
+        return ctx.label + " : " + euros(ctx.parsed) + " (" + pct + " %)";
+      }}}
+    }
+  };
+  if(chartAnnee){ chartAnnee.data = data; chartAnnee.options = opt; chartAnnee.update(); }
+  else chartAnnee = new Chart(document.getElementById("chart-annee"), {type:"doughnut", data:data, options:opt});
+}
+
+function rendreBilan(a, moisClos, nClos){
+  var tb = document.querySelector("#tbl-bilan tbody");
+  var totalAnnee = 0, moyTotale = 0;
+  var html = CATEGORIES.filter(function(c){
+    return a.moisSet.some(function(m){ return (a.parMoisCat[m][c] || 0) !== 0; });
+  }).map(function(c){
+    var tot = a.moisSet.reduce(function(s,m){ return s + (a.parMoisCat[m][c] || 0); }, 0);
+    var moy = nClos ? moisClos.reduce(function(s,m){ return s + (a.parMoisCat[m][c] || 0); }, 0) / nClos : null;
+    totalAnnee += tot;
+    if(moy !== null) moyTotale += moy;
+    return "<tr><td>" + echap(c) + "</td>" +
+      "<td class=\"montant\">" + euros(tot) + "</td>" +
+      "<td class=\"montant\">" + (moy === null ? "—" : euros(moy)) + "</td></tr>";
+  }).join("");
+  html += "<tr class=\"total\"><td>Total</td>" +
+    "<td class=\"montant\">" + euros(totalAnnee) + "</td>" +
+    "<td class=\"montant\">" + (nClos ? euros(moyTotale) : "—") + "</td></tr>";
+  tb.innerHTML = html;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Modale ajout / modif
+ * ------------------------------------------------------------------ */
+function peuplerSelectCat(){
+  document.getElementById("m-cat").innerHTML =
+    CATEGORIES.map(function(c){ return "<option value=\"" + echap(c) + "\">" + echap(c) + "</option>"; }).join("");
+}
+function ouvrirFormAjout(){
+  idCourant = null;
+  document.getElementById("modale-titre").textContent = "Ajouter une dépense";
+  document.getElementById("m-date").value = aujourdHui();
+  document.getElementById("m-magasin").value = "";
+  document.getElementById("m-cat").value = "Fruits et légumes";
+  document.getElementById("m-article").value = "";
+  document.getElementById("m-montant").value = "";
+  document.getElementById("ligne-suppr").style.display = "none";
+  document.getElementById("overlay").classList.add("on");
+  document.getElementById("m-magasin").focus();
+}
+function ouvrirFormModif(id){
+  var l = lignes.filter(function(x){ return x.id === id; })[0];
+  if(!l) return;
+  idCourant = id;
+  document.getElementById("modale-titre").textContent = "Modifier la dépense";
+  document.getElementById("m-date").value = l.date;
+  document.getElementById("m-magasin").value = l.magasin;
+  document.getElementById("m-cat").value = l.categorie;
+  document.getElementById("m-article").value = l.article;
+  document.getElementById("m-montant").value = l.montant;
+  document.getElementById("ligne-suppr").style.display = "flex";
+  document.getElementById("overlay").classList.add("on");
+}
+function fermerModale(){
+  document.getElementById("overlay").classList.remove("on");
+  idCourant = null;
+}
+function lireModale(){
+  return {
+    date: document.getElementById("m-date").value,
+    magasin: document.getElementById("m-magasin").value.trim(),
+    categorie: document.getElementById("m-cat").value,
+    article: document.getElementById("m-article").value.trim(),
+    montant: parseFloat(document.getElementById("m-montant").value.replace(",","."))
+  };
+}
+function validerModale(){
+  var o = lireModale();
+  if(!o.date){ toast("Il manque la date."); return; }
+  if(!o.magasin){ toast("Il manque le magasin."); return; }
+  if(!o.article){ o.article = o.categorie; }
+  if(isNaN(o.montant)){ toast("Montant invalide."); return; }
+
+  var btn = document.getElementById("m-valider");
+  btn.disabled = true; btn.textContent = "…";
+  var p;
+  if(idCourant){
+    o.source = (lignes.filter(function(x){ return x.id === idCourant; })[0] || {}).source || "manuel";
+    p = modifier(idCourant, o);
+  } else {
+    o.source = "manuel";
+    p = ajouter(o);
+  }
+  p.then(function(){
+    return charger();
+  }).then(function(){
+    fermerModale();
+    remplirFiltres(); rendreDepenses(); rendreSynthese();
+    toast(idCourant ? "Ligne modifiée." : "Dépense ajoutée.");
+  }).catch(function(e){
+    banniere("Échec de l'enregistrement : " + e.message);
+  }).then(function(){
+    btn.disabled = false; btn.textContent = "Enregistrer";
+  });
+}
+function supprimerCourant(){
+  if(!idCourant) return;
+  if(!confirm("Supprimer cette ligne ? Elle n'apparaîtra plus dans le suivi.")) return;
+  supprimerDoux(idCourant).then(function(){
+    return charger();
+  }).then(function(){
+    fermerModale();
+    remplirFiltres(); rendreDepenses(); rendreSynthese();
+    toast("Ligne supprimée.");
+  }).catch(function(e){
+    banniere("Échec de la suppression : " + e.message);
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ *  Navigation
+ * ------------------------------------------------------------------ */
+function montrerVue(v){
+  var dep = v === "depenses";
+  document.getElementById("vue-depenses").style.display = dep ? "" : "none";
+  document.getElementById("vue-synthese").style.display = dep ? "none" : "";
+  document.getElementById("tab-depenses").classList.toggle("actif", dep);
+  document.getElementById("tab-synthese").classList.toggle("actif", !dep);
+  if(!dep) rendreSynthese();
+}
+
+/* ------------------------------------------------------------------ *
+ *  Démarrage
+ * ------------------------------------------------------------------ */
+window.montrerVue = montrerVue;
+window.ouvrirFormAjout = ouvrirFormAjout;
+window.fermerModale = fermerModale;
+window.validerModale = validerModale;
+window.supprimerCourant = supprimerCourant;
+window.rendreDepenses = rendreDepenses;
+
+document.getElementById("overlay").addEventListener("click", function(e){
+  if(e.target === this) fermerModale();
+});
+
+peuplerSelectCat();
+banniere("Chargement…");
+charger().then(function(){
+  banniere("");
+  remplirFiltres();
+  rendreDepenses();
+}).catch(function(e){
+  banniere("Impossible de charger les données (" + e.message + "). Vérifie la connexion et recharge la page.");
+});
+
+})();
+</script>
+</body>
+</html>

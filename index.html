@@ -283,12 +283,6 @@
     </div>
 
     <div class="card">
-      <h2>Dépenses par catégorie et par mois</h2>
-      <div class="chart-box"><canvas id="chart-mois"></canvas></div>
-      <p class="note" id="note-histo">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
-    </div>
-
-    <div class="card">
       <h2>Bilan annuel 2026</h2>
       <div class="tableau-scroll">
         <table class="bilan" id="tbl-bilan">
@@ -299,6 +293,12 @@
         </table>
       </div>
       <p class="note" id="note-bilan"></p>
+    </div>
+
+    <div class="card">
+      <h2>Dépenses par catégorie et par mois</h2>
+      <div class="chart-box"><canvas id="chart-mois"></canvas></div>
+      <p class="note" id="note-histo">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
     </div>
   </section>
 </div>
@@ -989,7 +989,8 @@ function rendreChartMois(a){
       return {
         label: c,
         data: a.moisSet.map(function(m){ return Math.max(0, a.parMoisCat[m][c] || 0); }),
-        backgroundColor: COULEURS[c] || "#bbb"
+        backgroundColor: COULEURS[c] || "#bbb",
+        maxBarThickness: 64
       };
     })
   };
@@ -997,7 +998,10 @@ function rendreChartMois(a){
     responsive:true, maintainAspectRatio:false,
     scales:{ x:{stacked:true}, y:{stacked:true, ticks:{callback:function(v){ return v + " €"; }}} },
     plugins:{
-      legend:{position:"bottom", labels:{boxWidth:12, font:{size:11}}},
+      legend:{
+        position: window.matchMedia("(max-width:560px)").matches ? "bottom" : "right",
+        labels:{boxWidth:12, font:{size:11}}
+      },
       tooltip:{callbacks:{
         label:function(ctx){
           var tot = ctx.chart.data.datasets.reduce(function(s,d){ return s + (d.data[ctx.dataIndex] || 0); }, 0);

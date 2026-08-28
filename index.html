@@ -135,7 +135,7 @@
   .modale h3{margin:0 0 14px;font-size:16px}
   .champ{display:flex;flex-direction:column;gap:4px;margin-bottom:11px}
   .champ span{font-size:11.5px;color:var(--ink-soft)}
-  .champ input:disabled{background:var(--bg);color:var(--ink-soft);cursor:not-allowed}
+  .champ input:disabled,.champ select:disabled{background:var(--bg);color:var(--ink-soft);cursor:not-allowed}
   .champ .indice{font-size:11px;color:var(--ink-soft);font-style:italic}
   .modale-actions{display:flex;gap:8px;margin-top:6px}
   .modale-actions .btn{flex:1}
@@ -149,10 +149,11 @@
   .filtres label.ligne-check input{width:auto}
   td.tk-check{width:34px;text-align:center}
   td.tk-check input{width:18px;height:18px}
+  td.tk-paye,th.tk-paye{width:44px;text-align:center;font-variant-numeric:tabular-nums}
   tr.tk-ligne{cursor:pointer}
   tr.tk-ligne:hover{background:var(--accent-soft)}
   tr.tk-ligne.ouvert{background:var(--accent-soft)}
-  tr.tk-detail>td{padding:0;border-bottom:1px solid var(--line);background:#faf8f3}
+  tr.tk-detail>td{padding:0;border-bottom:1px solid var(--line);background:var(--accent-soft)}
   tr.tk-detail table{margin:0}
   tr.tk-detail th,tr.tk-detail td{border-bottom:1px solid var(--line);font-size:12.5px}
   tr.tk-detail tr:last-child td{border-bottom:none}
@@ -232,6 +233,9 @@
           <label>Magasin
             <select id="ft-magasin" onchange="rendreTickets()"><option value="">Tous</option></select>
           </label>
+          <label>Payé par
+            <select id="ft-payepar" onchange="rendreTickets()"><option value="">Tous</option><option value="Stéphanie">Stéphanie</option><option value="Frédéric">Frédéric</option></select>
+          </label>
           <label class="ligne-check">
             <input type="checkbox" id="ft-nonpointe" onchange="rendreTickets()"> Non pointés uniquement
           </label>
@@ -242,7 +246,7 @@
         <div class="tableau-scroll">
           <table id="tbl-tickets">
             <thead>
-              <tr><th class="tk-check">✓</th><th>Date</th><th>Magasin</th><th class="montant">Total</th></tr>
+              <tr><th class="tk-check">✓</th><th>Date</th><th>Magasin</th><th class="tk-paye">Payé</th><th class="montant">Total</th></tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -313,6 +317,10 @@
     <div class="champ"><span>Catégorie</span><select id="m-cat"></select></div>
     <div class="champ"><span>Article</span><input type="text" id="m-article" autocomplete="off"></div>
     <div class="champ"><span>Montant (€) — négatif pour un paiement fidélité</span><input type="number" id="m-montant" step="0.01" inputmode="decimal"></div>
+    <div class="champ"><span>Qui a payé</span>
+      <select id="m-payepar"><option value="Stéphanie">Stéphanie</option><option value="Frédéric">Frédéric</option></select>
+      <span class="indice" id="m-payepar-indice" style="display:none">Se modifie sur le ticket (onglet Dépenses &gt; Tickets).</span>
+    </div>
     <div class="modale-actions">
       <button class="btn ghost" onclick="fermerModale()">Annuler</button>
       <button class="btn" id="m-valider" onclick="validerModale()">Enregistrer</button>
@@ -332,6 +340,9 @@
       <input type="text" id="t-magasin" list="liste-magasins" autocomplete="off">
     </div>
     <div class="champ"><span>Total payé (€)</span><input type="number" id="t-total" step="0.01" inputmode="decimal"></div>
+    <div class="champ"><span>Qui a payé</span>
+      <select id="t-payepar"><option value="Stéphanie">Stéphanie</option><option value="Frédéric">Frédéric</option></select>
+    </div>
     <div class="champ"><span>Note (facultatif)</span><input type="text" id="t-note" autocomplete="off"></div>
     <label class="champ" style="flex-direction:row;align-items:center;gap:8px">
       <input type="checkbox" id="t-pointe" style="width:auto"> <span style="font-size:13px;color:var(--ink)">Pointé (retrouvé sur le relevé bancaire)</span>
@@ -441,6 +452,7 @@ function versChampsTicket(o){
     total:    {doubleValue: Number(o.total)},
     pointe:   {booleanValue: !!o.pointe},
     note:     {stringValue: o.note || ""},
+    payePar:  {stringValue: o.payePar || "Stéphanie"},
     supprime: {booleanValue: !!o.supprime},
     creeLe:   {stringValue: o.creeLe || new Date().toISOString()}
   };
@@ -477,6 +489,7 @@ function depuisDocTicket(d){
     total: Number(valChamp(f.total) || 0),
     pointe: valChamp(f.pointe) === true,
     note: valChamp(f.note) || "",
+    payePar: valChamp(f.payePar) || "Stéphanie",
     supprime: valChamp(f.supprime) === true,
     creeLe: valChamp(f.creeLe) || ""
   };
@@ -565,7 +578,7 @@ function ajouterTicket(o){
     .then(function(doc){ return doc.name.split("/").pop(); });
 }
 function modifierTicket(id, o){
-  var champs = ["date","magasin","total","pointe","note","supprime"];
+  var champs = ["date","magasin","total","pointe","note","payePar","supprime"];
   var mask = champs.map(function(c){ return "updateMask.fieldPaths=" + c; }).join("&");
   var body = {fields:{}}, complet = versChampsTicket(o);
   champs.forEach(function(c){ body.fields[c] = complet[c]; });
@@ -714,10 +727,12 @@ function montrerSousVue(v){
 function ticketsFiltres(){
   var fm = document.getElementById("ft-mois").value;
   var fg = document.getElementById("ft-magasin").value;
+  var fp = document.getElementById("ft-payepar").value;
   var nonPointe = document.getElementById("ft-nonpointe").checked;
   return tickets.filter(function(t){
     if(fm && moisDe(t.date) !== fm) return false;
     if(fg && t.magasin !== fg) return false;
+    if(fp && (t.payePar || "Stéphanie") !== fp) return false;
     if(nonPointe && t.pointe) return false;
     return true;
   }).sort(function(a,b){
@@ -748,6 +763,7 @@ function rendreTickets(){
         "<td class=\"tk-check\"><input type=\"checkbox\" data-pointe=\"" + t.id + "\"" + (t.pointe ? " checked" : "") + "></td>" +
         "<td>" + fmtDate(t.date) + "</td>" +
         "<td>" + echap(t.magasin) + (t.note ? " <span class=\"note\" style=\"margin:0\">· " + echap(t.note) + "</span>" : "") + "</td>" +
+        "<td class=\"tk-paye\">" + ((t.payePar || "Stéphanie") === "Frédéric" ? "F" : "S") + "</td>" +
         "<td class=\"montant\">" + euros(t.total) + "</td>" +
       "</tr>";
     if(ouvert){
@@ -759,7 +775,7 @@ function rendreTickets(){
           }).join("")
         : "<tr><td colspan=\"3\" class=\"vide\" style=\"padding:14px\">Aucune ligne rattachée à ce ticket.</td></tr>";
       var sommeTk = lignesTk.reduce(function(s,l){ return s + l.montant; }, 0);
-      rangee += "<tr class=\"tk-detail\"><td colspan=\"4\"><table><tbody>" + corps +
+      rangee += "<tr class=\"tk-detail\"><td colspan=\"5\"><table><tbody>" + corps +
         "<tr><td></td><td style=\"text-align:right;color:var(--ink-soft)\">Somme des lignes</td>" +
         "<td class=\"montant\" style=\"color:var(--ink-soft)\">" + euros(sommeTk) + "</td></tr>" +
         "<tr><td colspan=\"3\" style=\"text-align:right\">" +
@@ -810,6 +826,7 @@ function ouvrirFormTicket(){
   document.getElementById("t-date").value = aujourdHui();
   document.getElementById("t-magasin").value = "";
   document.getElementById("t-total").value = "";
+  document.getElementById("t-payepar").value = "Stéphanie";
   document.getElementById("t-note").value = "";
   document.getElementById("t-pointe").checked = false;
   document.getElementById("ticket-suppr").style.display = "none";
@@ -824,6 +841,7 @@ function ouvrirFormTicketModif(id){
   document.getElementById("t-date").value = t.date;
   document.getElementById("t-magasin").value = t.magasin;
   document.getElementById("t-total").value = t.total;
+  document.getElementById("t-payepar").value = t.payePar || "Stéphanie";
   document.getElementById("t-note").value = t.note;
   document.getElementById("t-pointe").checked = t.pointe;
   document.getElementById("ticket-suppr").style.display = "flex";
@@ -838,6 +856,7 @@ function lireModaleTicket(){
     date: document.getElementById("t-date").value,
     magasin: document.getElementById("t-magasin").value.trim(),
     total: parseFloat(document.getElementById("t-total").value.replace(",", ".")),
+    payePar: document.getElementById("t-payepar").value,
     note: document.getElementById("t-note").value.trim(),
     pointe: document.getElementById("t-pointe").checked
   };
@@ -1133,6 +1152,9 @@ function ouvrirFormAjout(){
   document.getElementById("m-cat").value = "Fruits et légumes";
   document.getElementById("m-article").value = "";
   document.getElementById("m-montant").value = "";
+  document.getElementById("m-payepar").value = "Stéphanie";
+  document.getElementById("m-payepar").disabled = false;
+  document.getElementById("m-payepar-indice").style.display = "none";
   document.getElementById("ligne-suppr").style.display = "none";
   document.getElementById("overlay").classList.add("on");
   document.getElementById("m-magasin").focus();
@@ -1149,6 +1171,10 @@ function ouvrirFormModif(id){
   document.getElementById("m-cat").value = l.categorie;
   document.getElementById("m-article").value = l.article;
   document.getElementById("m-montant").value = l.montant;
+  var tkPaye = tickets.filter(function(x){ return x.id === l.ticketId; })[0];
+  document.getElementById("m-payepar").value = (tkPaye && tkPaye.payePar) || "Stéphanie";
+  document.getElementById("m-payepar").disabled = true;
+  document.getElementById("m-payepar-indice").style.display = "";
   document.getElementById("ligne-suppr").style.display = "flex";
   document.getElementById("overlay").classList.add("on");
 }
@@ -1162,7 +1188,8 @@ function lireModale(){
     magasin: document.getElementById("m-magasin").value.trim(),
     categorie: document.getElementById("m-cat").value,
     article: document.getElementById("m-article").value.trim(),
-    montant: parseFloat(document.getElementById("m-montant").value.replace(",","."))
+    montant: parseFloat(document.getElementById("m-montant").value.replace(",",".")),
+    payePar: document.getElementById("m-payepar").value
   };
 }
 function validerModale(){
@@ -1187,7 +1214,7 @@ function validerModale(){
       p = ajouter(o);   // pas de collection tickets : on garde l'ancien comportement
     } else {
       // une dépense saisie à la main = un ticket à elle seule
-      p = ajouterTicket({date:o.date, magasin:o.magasin, total:o.montant, pointe:false})
+      p = ajouterTicket({date:o.date, magasin:o.magasin, total:o.montant, pointe:false, payePar:o.payePar})
         .then(function(tid){ o.ticketId = tid; return ajouter(o); });
     }
   }

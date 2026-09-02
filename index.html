@@ -279,7 +279,7 @@
         </div>
         <div class="pie-legende" id="pie-legende"></div>
       </div>
-      <p class="note" id="note-camembert">Part de chaque catégorie, hors « Paiement fidélité ».</p>
+      <p class="note" id="note-camembert">Part de chaque catégorie.</p>
     </div>
 
     <div class="card">
@@ -298,7 +298,7 @@
     <div class="card">
       <h2>Dépenses par catégorie et par mois</h2>
       <div class="chart-box"><canvas id="chart-mois"></canvas></div>
-      <p class="note" id="note-histo">Hors « Paiement fidélité » (ce n'est pas une dépense).</p>
+      <p class="note" id="note-histo">Dépenses par catégorie, mois par mois.</p>
     </div>
   </section>
 </div>
@@ -316,7 +316,7 @@
     </div>
     <div class="champ"><span>Catégorie</span><select id="m-cat"></select></div>
     <div class="champ"><span>Article</span><input type="text" id="m-article" autocomplete="off"></div>
-    <div class="champ"><span>Montant (€) — négatif pour un paiement fidélité</span><input type="number" id="m-montant" step="0.01" inputmode="decimal"></div>
+    <div class="champ"><span>Montant (€)</span><input type="number" id="m-montant" step="0.01" inputmode="decimal"></div>
     <div class="champ"><span>Qui a payé</span>
       <select id="m-payepar"><option value="Stéphanie">Stéphanie</option><option value="Frédéric">Frédéric</option></select>
       <span class="indice" id="m-payepar-indice" style="display:none">Se modifie sur le ticket (onglet Dépenses &gt; Tickets).</span>
@@ -382,14 +382,13 @@ var BASE_T = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT +
 var CATEGORIES = [
   "Protéines","Fruits et légumes","Produits secs","Conserves","Fromage/Crèmerie",
   "Épicerie/Condiments","Plats Préparés","Café","Eau","Pain","Droguerie/Hygiène",
-  "Snacking","Dessert","Alcool","Paiement fidélité"
+  "Snacking","Dessert","Alcool"
 ];
-var HORS_GRAPHIQUES = ["Paiement fidélité"];
 var NON_ALIMENTAIRE = ["Droguerie/Hygiène"];
 /* Palette « design-system.md » (option 6a), en oklch pour un contraste perçu
    régulier d'une teinte à l'autre. « Épicerie/Condiments » porte la couleur
    « Condiments » du nuancier ; « Dessert » (absente du nuancier) reçoit un
-   framboise distinct ; « Paiement fidélité » reste neutre et hors graphiques. */
+   framboise distinct. */
 var COULEURS = {
   "Protéines":          "oklch(0.52 0.15 355)",
   "Fruits et légumes":  "oklch(0.58 0.13 145)",
@@ -404,8 +403,7 @@ var COULEURS = {
   "Droguerie/Hygiène":  "oklch(0.75 0.07 190)",
   "Snacking":           "oklch(0.70 0.11 30)",
   "Dessert":            "oklch(0.72 0.13 340)",
-  "Alcool":             "oklch(0.42 0.11 15)",
-  "Paiement fidélité":  "oklch(0.72 0.012 260)"
+  "Alcool":             "oklch(0.42 0.11 15)"
 };
 /* Pastille de catégorie : la couleur mélangée à du blanc pour le fond, à
    l'encre principale pour le texte (color-mix gère les valeurs oklch). */
@@ -954,13 +952,12 @@ function rendreSynthese(){
 
 function catsGraphiques(){
   return CATEGORIES.filter(function(c){
-    if(HORS_GRAPHIQUES.indexOf(c) !== -1) return false;
     if(exclureNonAlim && NON_ALIMENTAIRE.indexOf(c) !== -1) return false;
     return true;
   });
 }
 function suffixeExclusion(){
-  return exclureNonAlim ? " et « " + NON_ALIMENTAIRE.join(" », « ") + " »" : "";
+  return exclureNonAlim ? ", « " + NON_ALIMENTAIRE.join(" », « ") + " » exclu" : "";
 }
 function texteePlage(){
   function jm(s){ var p = (s || "").split("-"); return p.length === 3 ? p[2] + "." + p[1] : ""; }
@@ -1019,7 +1016,7 @@ function rendreChartMois(a){
   else chartMois = new Chart(document.getElementById("chart-mois"), {type:"bar", data:data, options:opt});
 
   document.getElementById("note-histo").textContent =
-    "Hors « Paiement fidélité » (ce n'est pas une dépense)" + suffixeExclusion() + ".";
+    "Dépenses par catégorie, mois par mois" + suffixeExclusion() + ".";
 }
 
 function lignesPeriode(){
@@ -1099,7 +1096,7 @@ function rendreChartAnnee(){
   var pp = document.getElementById("periode-plage");
   if(pp) pp.textContent = texteePlage();
   document.getElementById("note-camembert").textContent =
-    "Part de chaque catégorie sur " + libellePeriode() + ", hors « Paiement fidélité »" + suffixeExclusion() + ".";
+    "Part de chaque catégorie sur " + libellePeriode() + suffixeExclusion() + ".";
 }
 
 function rendreBilan(a, moisClos, nClos){

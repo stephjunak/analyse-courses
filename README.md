@@ -31,9 +31,9 @@ est celui de `fav-deco`.
 
 ### Modèle d'un document `depenses`
 
-`date` (`"2026-08-01"`), `magasin`, `categorie`, `article`, `montant` (nombre,
-négatif possible pour un paiement fidélité), `source` (`migration` / `ticket` /
-`manuel`), `supprime` (booléen), `creeLe` (horodatage ISO).
+`date` (`"2026-08-01"`), `magasin`, `categorie`, `article`, `montant` (nombre),
+`source` (`migration` / `ticket` / `manuel`), `supprime` (booléen), `creeLe`
+(horodatage ISO).
 
 ### Points techniques repris de fav-deco
 

@@ -99,7 +99,7 @@
   .vide{color:var(--ink-soft);font-size:13.5px;text-align:center;padding:26px 10px}
   .chart-box{position:relative;height:300px}
   .bilan td.montant{font-variant-numeric:tabular-nums}
-  .bilan tr.total td{font-weight:700;border-top:2px solid var(--line)}
+  .bilan tr.total td{font-weight:700;border-bottom:2px solid var(--line)}
   .note{font-size:12px;color:var(--ink-soft);margin:8px 0 0}
   .filtre-periode{display:flex;flex-wrap:wrap;gap:2px 18px;align-items:center}
   .filtre-periode button{
@@ -260,6 +260,7 @@
   <section id="vue-synthese">
     <div class="card">
       <div class="filtre-periode" id="filtre-periode">
+        <button type="button" data-p="moyenne">En moyenne</button>
         <button type="button" data-p="mois" class="on">Mois en cours</button>
         <button type="button" data-p="annee">Année en cours</button>
         <button type="button" data-p="perso">Période personnalisée</button>
@@ -275,7 +276,7 @@
       <div class="pie-wrap" style="margin-top:16px">
         <div class="donut-box">
           <canvas id="chart-annee"></canvas>
-          <div class="donut-centre"><span class="dc-label">Total</span><span class="dc-val" id="donut-total">—</span></div>
+          <div class="donut-centre"><span class="dc-label" id="donut-label">Total</span><span class="dc-val" id="donut-total">—</span></div>
         </div>
         <div class="pie-legende" id="pie-legende"></div>
       </div>
@@ -385,6 +386,10 @@ var CATEGORIES = [
   "Snacking","Dessert","Alcool"
 ];
 var NON_ALIMENTAIRE = ["Droguerie/Hygiène"];
+/* Nombre moyen de jours par mois (365 / 12 ≈ 30,417). Sert à ramener la
+   moyenne journalière à une base mensuelle : moyenne mensuelle = moyenne
+   journalière × JOURS_PAR_MOIS. */
+var JOURS_PAR_MOIS = 30.417;
 /* Palette « design-system.md » (option 6a), en oklch pour un contraste perçu
    régulier d'une teinte à l'autre. « Épicerie/Condiments » porte la couleur
    « Condiments » du nuancier ; « Dessert » (absente du nuancier) reçoit un
@@ -931,23 +936,16 @@ function agregats(){
 
 function rendreSynthese(){
   var a = agregats();
-  var mc = moisCourant();
-  var moisClos = a.moisSet.filter(function(m){ return m < mc && a.totMois[m] > 0; });
-  var nClos = moisClos.length;
 
   rendreChartMois(a);
   rendreChartAnnee();
-  rendreBilan(a, moisClos, nClos);
+  rendreBilan(a);
 
   var note = document.getElementById("note-bilan");
   var prefixe = exclureNonAlim ? "Non alimentaire exclu (« " + NON_ALIMENTAIRE.join(" », « ") + " »). " : "";
-  var jourNote = " Moyenne journalière : total divisé par le nombre de jours écoulés depuis la première dépense (mois en cours inclus).";
-  if(nClos === 0){
-    note.textContent = prefixe + "Aucun mois clos pour l'instant (le mois en cours ne compte pas). La moyenne mensuelle apparaîtra quand un mois complet sera passé." + jourNote;
-  } else {
-    note.textContent = prefixe + "Moyenne mensuelle calculée sur " + nClos + " mois clos (" +
-      moisClos.map(moisLisible).join(", ") + "). Le mois en cours n'est jamais compté." + jourNote;
-  }
+  note.textContent = prefixe +
+    "Moyenne journalière : total divisé par le nombre de jours écoulés depuis la première dépense (mois en cours inclus). " +
+    "Moyenne mensuelle : cette moyenne journalière × 30,417 (nombre moyen de jours par mois), même base.";
 }
 
 function catsGraphiques(){
@@ -962,6 +960,9 @@ function suffixeExclusion(){
 function texteePlage(){
   function jm(s){ var p = (s || "").split("-"); return p.length === 3 ? p[2] + "." + p[1] : ""; }
   function jma(s){ var p = (s || "").split("-"); return p.length === 3 ? p[2] + "." + p[1] + "." + p[0] : ""; }
+  if(periodeSynthese === "moyenne"){
+    return "≈ 1 mois (30,417 j)";
+  }
   if(periodeSynthese === "mois"){
     var m = String(new Date().getMonth()+1).padStart(2,"0");
     return "01." + m + " → " + jma(aujourdHui());
@@ -1020,6 +1021,9 @@ function rendreChartMois(a){
 }
 
 function lignesPeriode(){
+  if(periodeSynthese === "moyenne"){
+    return lignes.slice();
+  }
   if(periodeSynthese === "mois"){
     var mc = moisCourant();
     return lignes.filter(function(l){ return moisDe(l.date) === mc; });
@@ -1053,6 +1057,13 @@ function rendreChartAnnee(){
     if(tot[l.categorie] === undefined) return;
     if(l.montant > 0) tot[l.categorie] += l.montant;
   });
+  if(periodeSynthese === "moyenne"){
+    // Cumul depuis la 1re dépense ramené à un mois moyen. Mise à l'échelle
+    // uniforme : les parts et les % restent ceux du cumul complet.
+    var jm = fenetreJours();
+    var facteur = jm ? JOURS_PAR_MOIS / jm : 0;
+    cats.forEach(function(c){ tot[c] = tot[c] * facteur; });
+  }
   var garde = [];
   cats.forEach(function(c){ if(tot[c] > 0) garde.push({c:c, v:tot[c]}); });   // ordre fixe des catégories, non nulles
   var grandTotal = garde.reduce(function(s,g){ return s + g.v; }, 0);
@@ -1093,47 +1104,52 @@ function rendreChartAnnee(){
     }).join("");
     if(dt) dt.textContent = euros(grandTotal);
   }
+  var dl = document.getElementById("donut-label");
+  if(dl) dl.textContent = periodeSynthese === "moyenne" ? "Moy./mois" : "Total";
   var pp = document.getElementById("periode-plage");
   if(pp) pp.textContent = texteePlage();
-  document.getElementById("note-camembert").textContent =
-    "Part de chaque catégorie sur " + libellePeriode() + suffixeExclusion() + ".";
+  document.getElementById("note-camembert").textContent = periodeSynthese === "moyenne"
+    ? "Dépense d'un mois moyen par catégorie" + suffixeExclusion() + "."
+    : "Part de chaque catégorie sur " + libellePeriode() + suffixeExclusion() + ".";
 }
 
-function rendreBilan(a, moisClos, nClos){
-  var tb = document.querySelector("#tbl-bilan tbody");
-  var totalAnnee = 0, moyTotale = 0;
-
-  // Fenêtre en jours pour la moyenne journalière : de la 1re à la dernière
-  // dépense enregistrée, mois en cours inclus, même périmètre que le tableau.
-  var datesActives = lignes.filter(function(l){
+function fenetreJours(){
+  // Nombre de jours de la 1re à la dernière dépense enregistrée (mois en cours
+  // inclus), même périmètre que le Bilan. Base commune à la moyenne journalière,
+  // à la moyenne mensuelle et au mode « En moyenne » du camembert.
+  var dates = lignes.filter(function(l){
     if(exclureNonAlim && NON_ALIMENTAIRE.indexOf(l.categorie) !== -1) return false;
     return !!l.date;
   }).map(function(l){ return l.date; }).sort();
-  var jours = 0;
-  if(datesActives.length){
-    var d1 = new Date(datesActives[0] + "T00:00:00");
-    var d2 = new Date(datesActives[datesActives.length - 1] + "T00:00:00");
-    jours = Math.round((d2 - d1) / 86400000) + 1;
-  }
+  if(!dates.length) return 0;
+  var d1 = new Date(dates[0] + "T00:00:00");
+  var d2 = new Date(dates[dates.length - 1] + "T00:00:00");
+  return Math.round((d2 - d1) / 86400000) + 1;
+}
 
-  var html = CATEGORIES.filter(function(c){
+function rendreBilan(a){
+  var tb = document.querySelector("#tbl-bilan tbody");
+  var totalAnnee = 0, moyTotale = 0;
+  var jours = fenetreJours();   // moy. journalière = total / jours ; moy. mensuelle = journalière × JOURS_PAR_MOIS
+
+  var lignesCat = CATEGORIES.filter(function(c){
     if(exclureNonAlim && NON_ALIMENTAIRE.indexOf(c) !== -1) return false;
     return a.moisSet.some(function(m){ return (a.parMoisCat[m][c] || 0) !== 0; });
   }).map(function(c){
     var tot = a.moisSet.reduce(function(s,m){ return s + (a.parMoisCat[m][c] || 0); }, 0);
-    var moy = nClos ? moisClos.reduce(function(s,m){ return s + (a.parMoisCat[m][c] || 0); }, 0) / nClos : null;
+    var moy = jours ? (tot / jours) * JOURS_PAR_MOIS : null;
     totalAnnee += tot;
     if(moy !== null) moyTotale += moy;
     return "<tr><td>" + echap(c) + "</td>" +
       "<td class=\"montant\">" + euros(tot) + "</td>" +
       "<td class=\"montant\">" + (moy === null ? "—" : euros(moy)) + "</td>" +
       "<td class=\"montant\">" + (jours ? euros(tot / jours) : "—") + "</td></tr>";
-  }).join("");
-  html += "<tr class=\"total\"><td>Total</td>" +
+  });
+  var ligneTotal = "<tr class=\"total\"><td>Total</td>" +
     "<td class=\"montant\">" + euros(totalAnnee) + "</td>" +
-    "<td class=\"montant\">" + (nClos ? euros(moyTotale) : "—") + "</td>" +
+    "<td class=\"montant\">" + (jours ? euros(moyTotale) : "—") + "</td>" +
     "<td class=\"montant\">" + (jours ? euros(totalAnnee / jours) : "—") + "</td></tr>";
-  tb.innerHTML = html;
+  tb.innerHTML = ligneTotal + lignesCat.join("");
 }
 
 /* ------------------------------------------------------------------ *

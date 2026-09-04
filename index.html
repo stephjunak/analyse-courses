@@ -163,6 +163,7 @@
   #tbl-bc-postes input[type=number],#tbl-bc-ajust input[type=number]{width:90px;text-align:right}
   #tbl-bc-postes select,#tbl-bc-ajust select{width:auto}
   #tbl-bc-postes tr.inactif{opacity:.45}
+  #tbl-bc-postes input:disabled{background:var(--bg);color:var(--ink-soft);cursor:not-allowed}
   .bc-resume{display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:var(--ink-soft)}
   .bc-resume b{color:var(--ink)}
   .bc-virement{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:15px;font-weight:600;text-align:center}
@@ -353,7 +354,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="note">Décoche un poste qui ne s'applique pas ce mois-ci (ex. Engie, payé un mois sur deux).</p>
+      <p class="note">Décoche un poste qui ne s'applique pas ce mois-ci (ex. Engie, payé un mois sur deux). Les lignes Courses sont calculées automatiquement depuis les tickets du mois (payés par chacun) : utilise « Vérifier » pour t'assurer que tout est saisi avant de valider.</p>
     </div>
 
     <div class="card">
@@ -488,8 +489,8 @@ var NON_ALIMENTAIRE = ["Droguerie/Hygiène"];
 /* Postes fixes du Budget couple, pré-remplis chaque mois (décochables si le
    poste ne s'applique pas ce mois-ci, ex. Engie payé un mois sur deux). */
 var POSTES_FIXES = [
-  {nom: "Courses (Stéphanie)", payePar: "Stéphanie"},
-  {nom: "Courses (Frédéric)", payePar: "Frédéric"},
+  {nom: "Courses (Stéphanie)", payePar: "Stéphanie", auto: true},
+  {nom: "Courses (Frédéric)", payePar: "Frédéric", auto: true},
   {nom: "Loyer", payePar: "Frédéric"},
   {nom: "Engie", payePar: "Frédéric"},
   {nom: "Internet", payePar: "Frédéric"},
@@ -754,7 +755,8 @@ function posteVersMapValue(p){
     montant:  {doubleValue: Number(p.montant) || 0},
     payePar:  {stringValue: p.payePar || "Stéphanie"},
     actif:    {booleanValue: p.actif !== false},
-    ponctuel: {booleanValue: !!p.ponctuel}
+    ponctuel: {booleanValue: !!p.ponctuel},
+    auto:     {booleanValue: !!p.auto}
   }}};
 }
 function ajustementVersMapValue(a){
@@ -780,7 +782,8 @@ function posteDepuisMapValue(v){
     montant: Number(valChamp(f.montant) || 0),
     payePar: valChamp(f.payePar) || "Stéphanie",
     actif: valChamp(f.actif) !== false,
-    ponctuel: valChamp(f.ponctuel) === true
+    ponctuel: valChamp(f.ponctuel) === true,
+    auto: valChamp(f.auto) === true
   };
 }
 function ajustementDepuisMapValue(v){
@@ -1162,11 +1165,33 @@ function moisParDefautBudget(){
     mois: "",
     cloture: false,
     postes: POSTES_FIXES.map(function(p){
-      return {nom:p.nom, montant:0, payePar:p.payePar, actif:true, ponctuel:false};
+      return {nom:p.nom, montant:0, payePar:p.payePar, actif:true, ponctuel:false, auto:!!p.auto};
     }),
     ajustements: []
   };
 }
+/* Courses payées par chacun sur un mois donné, calculées depuis les vraies
+   dépenses (via le payePar du ticket rattaché à chaque ligne) — pas une
+   saisie manuelle. Sert aux postes « Courses (Stéphanie/Frédéric) », toujours
+   recalculée en direct pour ne jamais dépendre d'une valeur figée en base. */
+function coursesParPayeurPourMois(mois){
+  var payeParTicket = {};
+  tickets.forEach(function(t){ payeParTicket[t.id] = t.payePar || "Stéphanie"; });
+  var tot = {"Stéphanie": 0, "Frédéric": 0};
+  lignes.forEach(function(l){
+    if(moisDe(l.date) !== mois) return;
+    if(l.montant <= 0) return;
+    var k = payeParTicket[l.ticketId] || "Stéphanie";
+    tot[k] = (tot[k] || 0) + l.montant;
+  });
+  return tot;
+}
+/* Montant effectif d'un poste : calculé pour un poste auto (Courses),
+   saisi tel quel sinon. */
+function montantPoste(p, autoVals){
+  return p.auto ? (autoVals[p.payePar] || 0) : (Number(p.montant) || 0);
+}
+
 function chargerMoisEnEdition(mois){
   var existant = budgetMois.filter(function(b){ return b.mois === mois; })[0];
   budgetActuel = existant
@@ -1191,19 +1216,26 @@ function moisBudgetDecal(delta){
 }
 
 function rendrePostes(){
+  var autoVals = coursesParPayeurPourMois(budgetActuel.mois);
   var tb = document.querySelector("#tbl-bc-postes tbody");
   tb.innerHTML = budgetActuel.postes.map(function(p, i){
+    var montantAffiche = p.auto ? Math.round((autoVals[p.payePar] || 0) * 100) / 100 : p.montant;
     return "<tr class=\"" + (p.actif ? "" : "inactif") + "\">" +
       "<td class=\"tk-check\"><input type=\"checkbox\" data-bc-actif=\"" + i + "\"" + (p.actif ? " checked" : "") + "></td>" +
       "<td>" + (p.ponctuel
           ? "<input type=\"text\" data-bc-nom=\"" + i + "\" value=\"" + echap(p.nom) + "\" placeholder=\"Nom du poste\">"
           : echap(p.nom)) + "</td>" +
-      "<td><input type=\"number\" step=\"0.01\" inputmode=\"decimal\" data-bc-montant=\"" + i + "\" value=\"" + p.montant + "\"></td>" +
-      "<td><select data-bc-payepar=\"" + i + "\">" +
-        "<option value=\"Stéphanie\"" + (p.payePar === "Stéphanie" ? " selected" : "") + ">Stéphanie</option>" +
-        "<option value=\"Frédéric\"" + (p.payePar === "Frédéric" ? " selected" : "") + ">Frédéric</option>" +
-      "</select></td>" +
-      "<td>" + (p.ponctuel ? "<button class=\"btn ghost\" data-bc-suppr-poste=\"" + i + "\" style=\"padding:4px 8px;font-size:11px\">✕</button>" : "") + "</td>" +
+      "<td><input type=\"number\" step=\"0.01\" inputmode=\"decimal\" data-bc-montant=\"" + i + "\" value=\"" + montantAffiche + "\"" +
+        (p.auto ? " disabled title=\"Calculé automatiquement depuis les tickets de ce mois\"" : "") + "></td>" +
+      "<td>" + (p.auto
+          ? echap(p.payePar)
+          : ("<select data-bc-payepar=\"" + i + "\">" +
+              "<option value=\"Stéphanie\"" + (p.payePar === "Stéphanie" ? " selected" : "") + ">Stéphanie</option>" +
+              "<option value=\"Frédéric\"" + (p.payePar === "Frédéric" ? " selected" : "") + ">Frédéric</option>" +
+            "</select>")) + "</td>" +
+      "<td>" + (p.ponctuel
+          ? "<button class=\"btn ghost\" data-bc-suppr-poste=\"" + i + "\" style=\"padding:4px 8px;font-size:11px\">✕</button>"
+          : (p.auto ? "<button type=\"button\" class=\"btn ghost\" data-bc-verif=\"" + i + "\" style=\"padding:4px 8px;font-size:11px\">Vérifier</button>" : "")) + "</td>" +
     "</tr>";
   }).join("");
 
@@ -1238,6 +1270,24 @@ function rendrePostes(){
       rendrePostes(); recalculerBudget();
     });
   });
+  Array.prototype.forEach.call(tb.querySelectorAll("[data-bc-verif]"), function(b){
+    b.addEventListener("click", function(){
+      var p = budgetActuel.postes[+b.getAttribute("data-bc-verif")];
+      verifierTicketsCourses(budgetActuel.mois, p.payePar);
+    });
+  });
+}
+
+/* Bascule vers Dépenses > Tickets, filtré sur le mois et le payeur du poste
+   Courses cliqué, pour vérifier que tous les tickets du mois sont saisis. */
+function verifierTicketsCourses(mois, payeur){
+  montrerVue("depenses");
+  montrerSousVue("tickets");
+  document.getElementById("ft-mois").value = mois;
+  document.getElementById("ft-magasin").value = "";
+  document.getElementById("ft-payepar").value = payeur;
+  document.getElementById("ft-nonpointe").checked = false;
+  rendreTickets();
 }
 
 function rendreAjustements(){
@@ -1303,10 +1353,11 @@ function ajouterAjustement(){
    Base = part de chacun (total ÷ 2) moins ce que la personne a déjà payé,
    puis + / − les ajustements personnels (hors split, réglés en plus). */
 function calculerBudget(o){
+  var autoVals = coursesParPayeurPourMois(o.mois);
   var actifs = (o.postes || []).filter(function(p){ return p.actif; });
-  var total = actifs.reduce(function(s,p){ return s + (Number(p.montant) || 0); }, 0);
+  var total = actifs.reduce(function(s,p){ return s + montantPoste(p, autoVals); }, 0);
   var payeS = actifs.filter(function(p){ return p.payePar === "Stéphanie"; })
-    .reduce(function(s,p){ return s + (Number(p.montant) || 0); }, 0);
+    .reduce(function(s,p){ return s + montantPoste(p, autoVals); }, 0);
   var payeF = total - payeS;
   var part = total / 2;
   var baseS = part - payeS;
@@ -1794,7 +1845,11 @@ function montrerVue(v){
   document.getElementById("tab-budget").classList.toggle("actif", v === "budget");
   if(v === "synthese") rendreSynthese();
   else if(v === "depenses" && sousVue === "tickets") rendreTickets();
-  else if(v === "budget") rendreHistoriqueBudget();
+  else if(v === "budget"){
+    // les Courses sont calculées depuis les tickets : toujours à jour en rouvrant l'onglet
+    if(budgetActuel){ rendrePostes(); recalculerBudget(); }
+    rendreHistoriqueBudget();
+  }
 }
 
 /* ------------------------------------------------------------------ *

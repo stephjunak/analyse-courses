@@ -465,8 +465,11 @@ var BASE_BC = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT +
 var CATEGORIES = [
   "Protéines","Fruits et légumes","Produits secs","Conserves","Fromage/Crèmerie",
   "Épicerie/Condiments","Plats Préparés","Café","Eau","Pain","Droguerie/Hygiène",
-  "Snacking","Dessert","Alcool"
+  "Snacking","Dessert","Alcool","Non catégorisé"
 ];
+/* Catégorie attribuée automatiquement à un ticket ajouté sans détail (bouton
+   « + Ticket »), pour que le total reste juste tant qu'il n'est pas détaillé. */
+var CATEGORIE_NON_DETAILLEE = "Non catégorisé";
 var NON_ALIMENTAIRE = ["Droguerie/Hygiène"];
 /* Postes fixes du Budget couple, pré-remplis chaque mois (décochables si le
    poste ne s'applique pas ce mois-ci, ex. Engie payé un mois sur deux). */
@@ -493,7 +496,8 @@ var COULEURS = {
   "Droguerie/Hygiène":  "oklch(0.75 0.07 190)",
   "Snacking":           "oklch(0.70 0.11 30)",
   "Dessert":            "oklch(0.72 0.13 340)",
-  "Alcool":             "oklch(0.42 0.11 15)"
+  "Alcool":             "oklch(0.42 0.11 15)",
+  "Non catégorisé":     "oklch(0.62 0 0)"
 };
 /* Pastille de catégorie : la couleur mélangée à du blanc pour le fond, à
    l'encre principale pour le texte (color-mix gère les valeurs oklch). */
@@ -1055,19 +1059,33 @@ function validerModaleTicket(){
     var ancien = tickets.filter(function(x){ return x.id === idTicketCourant; })[0] || {};
     var bougeDate = o.date !== ancien.date;
     var bougeMag  = o.magasin !== ancien.magasin;
+    var bougeTotal = o.total !== ancien.total;
+    var lignesTk = lignes.filter(function(l){ return l.ticketId === idTicketCourant; });
+    // seul cas où le montant se répercute sur la ligne : un ticket resté
+    // « Non catégorisé » (pas encore détaillé). Un ticket réellement détaillé
+    // n'a pas de contrôle d'écart somme-des-lignes vs total (voir README).
+    var seuleNonCat = lignesTk.length === 1 && lignesTk[0].categorie === CATEGORIE_NON_DETAILLEE;
     // la date et le magasin vivent sur le ticket : on les répercute sur ses lignes
-    var majLignes = (bougeDate || bougeMag)
-      ? lignes.filter(function(l){ return l.ticketId === idTicketCourant; }).map(function(l){
+    var majLignes = (bougeDate || bougeMag || (bougeTotal && seuleNonCat))
+      ? lignesTk.map(function(l){
           return modifier(l.id, {
             date: o.date, magasin: o.magasin,
-            categorie: l.categorie, article: l.article, montant: l.montant,
+            categorie: l.categorie, article: l.article,
+            montant: (bougeTotal && seuleNonCat) ? o.total : l.montant,
             source: l.source, ticketId: l.ticketId, supprime: l.supprime
           });
         })
       : [];
     p = modifierTicket(idTicketCourant, o).then(function(){ return Promise.all(majLignes); });
   } else {
-    p = ajouterTicket(o);
+    // un ticket créé sans détail est compté en entier dans « Non catégorisé »,
+    // pour que le total reste juste tant qu'il n'est pas détaillé
+    p = ajouterTicket(o).then(function(tid){
+      return ajouter({
+        date: o.date, magasin: o.magasin, categorie: CATEGORIE_NON_DETAILLEE,
+        article: CATEGORIE_NON_DETAILLEE, montant: o.total, source: "ticket", ticketId: tid
+      });
+    });
   }
   p.then(charger).then(function(){
     fermerModaleTicket();

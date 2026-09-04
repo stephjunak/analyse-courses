@@ -168,6 +168,9 @@
   .bc-virement{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:15px;font-weight:600;text-align:center}
   .bc-ligne-actions{display:flex;justify-content:flex-end;margin-top:12px}
   #tbl-bc-histo tr.modifiable td{color:var(--ink)}
+  .bc-nav-mois{display:flex;align-items:center;gap:6px}
+  .bc-nav-mois input{flex:1;text-align:center}
+  .bc-nav-mois button{padding:8px 12px;line-height:1;font-size:15px}
 </style>
 </head>
 <body>
@@ -318,14 +321,17 @@
   <section id="vue-budget" style="display:none">
     <div class="card">
       <h2>Mois</h2>
-      <div class="filtres">
-        <label>Mois concerné
+      <label style="display:flex;flex-direction:column;gap:6px;font-size:11px;color:var(--ink-soft)">
+        Mois concerné
+        <div class="bc-nav-mois">
+          <button type="button" class="btn ghost" onclick="moisBudgetDecal(-1)" aria-label="Mois précédent">‹</button>
           <input type="month" id="bc-mois" onchange="changerMoisBudget()">
-        </label>
-        <label class="ligne-check" style="align-self:flex-end">
-          <input type="checkbox" id="bc-cloture"> Mois clôturé
-        </label>
-      </div>
+          <button type="button" class="btn ghost" onclick="moisBudgetDecal(1)" aria-label="Mois suivant">›</button>
+        </div>
+      </label>
+      <label class="ligne-nonalim" style="margin-top:12px">
+        <input type="checkbox" id="bc-cloture"> Mois clôturé
+      </label>
     </div>
 
     <div class="card">
@@ -1141,6 +1147,14 @@ function changerMoisBudget(){
   var m = document.getElementById("bc-mois").value;
   if(m) chargerMoisEnEdition(m);
 }
+function moisBudgetDecal(delta){
+  var v = document.getElementById("bc-mois").value || moisCourant();
+  var p = v.split("-");
+  var d = new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1);
+  var m = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  document.getElementById("bc-mois").value = m;
+  chargerMoisEnEdition(m);
+}
 
 function rendrePostes(){
   var tb = document.querySelector("#tbl-bc-postes tbody");
@@ -1720,6 +1734,7 @@ window.fermerModaleTicket = fermerModaleTicket;
 window.validerModaleTicket = validerModaleTicket;
 window.supprimerTicketCourant = supprimerTicketCourant;
 window.changerMoisBudget = changerMoisBudget;
+window.moisBudgetDecal = moisBudgetDecal;
 window.ajouterPostePonctuel = ajouterPostePonctuel;
 window.ajouterAjustement = ajouterAjustement;
 window.enregistrerBudgetActuel = enregistrerBudgetActuel;

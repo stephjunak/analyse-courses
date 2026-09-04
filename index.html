@@ -521,20 +521,21 @@ function stylePuce(cat){
          "color:color-mix(in srgb," + c + " 72%, #1a2233)";
 }
 
-/* Couleurs du camembert quand il est vu par payeur (fixes) ou par magasin
-   (liste ouverte : couleur stable par hash, pour rester la même à chaque
-   rendu sans devoir maintenir une palette manuelle). */
-var COULEURS_PAYEUR = {"Stéphanie": "oklch(0.34 0.075 262)", "Frédéric": "oklch(0.60 0.14 45)"};
-var PALETTE_MAGASINS = [
-  "oklch(0.55 0.14 25)","oklch(0.55 0.13 145)","oklch(0.50 0.12 260)",
-  "oklch(0.60 0.13 90)","oklch(0.55 0.14 320)","oklch(0.50 0.10 190)",
-  "oklch(0.58 0.13 55)","oklch(0.50 0.12 210)","oklch(0.55 0.14 350)",
-  "oklch(0.52 0.11 165)","oklch(0.52 0.13 290)","oklch(0.50 0.09 15)"
-];
-function couleurMagasin(nom){
-  var h = 0;
-  for(var i = 0; i < nom.length; i++){ h = (h * 31 + nom.charCodeAt(i)) >>> 0; }
-  return PALETTE_MAGASINS[h % PALETTE_MAGASINS.length];
+/* Couleurs du camembert vu par payeur : Frédéric en bleu nuit (accent de
+   l'app), Stéphanie en rose foncé (couleur de la catégorie Protéines). */
+var COULEURS_PAYEUR = {"Stéphanie": "oklch(0.52 0.15 355)", "Frédéric": "oklch(0.34 0.075 262)"};
+/* Couleurs du camembert vu par magasin : la même palette que les catégories,
+   réattribuée par magasin. Assignation stable (tous les magasins jamais vus,
+   triés alphabétiquement, pas seulement ceux de la période affichée) pour
+   qu'un magasin garde toujours la même couleur d'une vue à l'autre. */
+function couleursMagasins(){
+  var palette = CATEGORIES.map(function(c){ return COULEURS[c]; });
+  var tous = uniques(lignes.map(function(l){ return l.magasin; }))
+    .filter(Boolean)
+    .sort(function(a, b){ return a.localeCompare(b, "fr"); });
+  var map = {};
+  tous.forEach(function(m, i){ map[m] = palette[i % palette.length]; });
+  return map;
 }
 
 /* ------------------------------------------------------------------ *
@@ -1542,7 +1543,8 @@ function rendreChartAnnee(){
       tot[k] = (tot[k] || 0) + l.montant;
     });
     ordre = Object.keys(tot).sort(function(a,b){ return tot[b] - tot[a]; });   // du plus dépensé au moins dépensé
-    couleurDe = couleurMagasin;
+    var mapMagasins = couleursMagasins();
+    couleurDe = function(k){ return mapMagasins[k] || "#bbb"; };
     libelleDim = "magasin";
   } else if(vueCamembert === "payeur"){
     var payeParTicket = {};

@@ -195,12 +195,12 @@
   <!-- VUE DÉPENSES -->
   <section id="vue-depenses" style="display:none">
     <div class="tabs sous-tabs">
-      <button id="sous-tab-detail" class="actif" onclick="montrerSousVue('detail')">Détail</button>
-      <button id="sous-tab-tickets" onclick="montrerSousVue('tickets')">Tickets</button>
+      <button id="sous-tab-detail" onclick="montrerSousVue('detail')">Détail</button>
+      <button id="sous-tab-tickets" class="actif" onclick="montrerSousVue('tickets')">Tickets</button>
     </div>
 
     <!-- SOUS-VUE DÉTAIL -->
-    <div id="sous-vue-detail">
+    <div id="sous-vue-detail" style="display:none">
       <div class="barre-actions">
         <span class="tot-ligne">Filtré : <b id="tot-filtre">–</b> · <span id="nb-filtre">0</span> ligne(s)</span>
         <button class="btn" onclick="ouvrirFormAjout()">+ Ajouter</button>
@@ -234,7 +234,7 @@
     </div>
 
     <!-- SOUS-VUE TICKETS -->
-    <div id="sous-vue-tickets" style="display:none">
+    <div id="sous-vue-tickets">
       <div class="barre-actions">
         <span class="tot-ligne"><b id="tot-tickets">–</b> · <span id="nb-tickets">0</span> ticket(s)</span>
         <button class="btn" onclick="ouvrirFormTicket()">+ Ticket</button>
@@ -556,7 +556,7 @@ var chartMois = null, chartAnnee = null;
 var periodeSynthese = "mois";    // "mois" | "annee" | "perso" — ne pilote que le camembert
 var exclureNonAlim = false;      // case « Exclure le non alimentaire » (Synthèse, non mémorisée)
 var vueCamembert = "categorie";  // "categorie" | "magasin" | "payeur" — dimension du camembert
-var sousVue = "detail";   // "detail" | "tickets" — onglet Dépenses
+var sousVue = "tickets";   // "detail" | "tickets" — onglet Dépenses
 var ticketsIndispo = false;   // true si les règles Firestore n'autorisent pas encore la collection tickets
 var idCourant = null;     // ligne en cours d'édition dans la modale
 var idTicketCourant = null;   // ticket en cours d'édition dans la modale ticket

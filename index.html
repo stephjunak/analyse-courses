@@ -487,7 +487,15 @@ var CATEGORIE_NON_DETAILLEE = "Non catégorisé";
 var NON_ALIMENTAIRE = ["Droguerie/Hygiène"];
 /* Postes fixes du Budget couple, pré-remplis chaque mois (décochables si le
    poste ne s'applique pas ce mois-ci, ex. Engie payé un mois sur deux). */
-var POSTES_FIXES = ["Courses","Loyer","Engie","Internet","Canal+","Assurance habitation"];
+var POSTES_FIXES = [
+  {nom: "Courses (Stéphanie)", payePar: "Stéphanie"},
+  {nom: "Courses (Frédéric)", payePar: "Frédéric"},
+  {nom: "Loyer", payePar: "Frédéric"},
+  {nom: "Engie", payePar: "Frédéric"},
+  {nom: "Internet", payePar: "Frédéric"},
+  {nom: "Canal+", payePar: "Frédéric"},
+  {nom: "Assurance habitation", payePar: "Frédéric"}
+];
 /* Nombre moyen de jours par mois (365 / 12 ≈ 30,417). Sert à ramener la
    moyenne journalière à une base mensuelle : moyenne mensuelle = moyenne
    journalière × JOURS_PAR_MOIS. */
@@ -1153,8 +1161,8 @@ function moisParDefautBudget(){
   return {
     mois: "",
     cloture: false,
-    postes: POSTES_FIXES.map(function(nom){
-      return {nom:nom, montant:0, payePar:"Stéphanie", actif:true, ponctuel:false};
+    postes: POSTES_FIXES.map(function(p){
+      return {nom:p.nom, montant:0, payePar:p.payePar, actif:true, ponctuel:false};
     }),
     ajustements: []
   };

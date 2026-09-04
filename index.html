@@ -273,6 +273,14 @@
   <!-- VUE SYNTHÈSE -->
   <section id="vue-synthese">
     <div class="card">
+      <div class="barre-actions" style="margin-bottom:12px">
+        <h2 style="margin:0">Répartition</h2>
+        <div class="tabs" id="vue-camembert-tabs" style="margin:0">
+          <button type="button" data-vc="categorie" class="actif" onclick="changerVueCamembert('categorie')">Catégorie</button>
+          <button type="button" data-vc="magasin" onclick="changerVueCamembert('magasin')">Magasin</button>
+          <button type="button" data-vc="payeur" onclick="changerVueCamembert('payeur')">Payeur</button>
+        </div>
+      </div>
       <div class="filtre-periode" id="filtre-periode">
         <button type="button" data-p="moyenne">En moyenne</button>
         <button type="button" data-p="mois" class="on">Mois en cours</button>
@@ -513,6 +521,22 @@ function stylePuce(cat){
          "color:color-mix(in srgb," + c + " 72%, #1a2233)";
 }
 
+/* Couleurs du camembert quand il est vu par payeur (fixes) ou par magasin
+   (liste ouverte : couleur stable par hash, pour rester la même à chaque
+   rendu sans devoir maintenir une palette manuelle). */
+var COULEURS_PAYEUR = {"Stéphanie": "oklch(0.34 0.075 262)", "Frédéric": "oklch(0.60 0.14 45)"};
+var PALETTE_MAGASINS = [
+  "oklch(0.55 0.14 25)","oklch(0.55 0.13 145)","oklch(0.50 0.12 260)",
+  "oklch(0.60 0.13 90)","oklch(0.55 0.14 320)","oklch(0.50 0.10 190)",
+  "oklch(0.58 0.13 55)","oklch(0.50 0.12 210)","oklch(0.55 0.14 350)",
+  "oklch(0.52 0.11 165)","oklch(0.52 0.13 290)","oklch(0.50 0.09 15)"
+];
+function couleurMagasin(nom){
+  var h = 0;
+  for(var i = 0; i < nom.length; i++){ h = (h * 31 + nom.charCodeAt(i)) >>> 0; }
+  return PALETTE_MAGASINS[h % PALETTE_MAGASINS.length];
+}
+
 /* ------------------------------------------------------------------ *
  *  État
  * ------------------------------------------------------------------ */
@@ -521,6 +545,7 @@ var tickets = [];         // {id, date, magasin, total, pointe, note, supprime, 
 var chartMois = null, chartAnnee = null;
 var periodeSynthese = "mois";    // "mois" | "annee" | "perso" — ne pilote que le camembert
 var exclureNonAlim = false;      // case « Exclure le non alimentaire » (Synthèse, non mémorisée)
+var vueCamembert = "categorie";  // "categorie" | "magasin" | "payeur" — dimension du camembert
 var sousVue = "detail";   // "detail" | "tickets" — onglet Dépenses
 var ticketsIndispo = false;   // true si les règles Firestore n'autorisent pas encore la collection tickets
 var idCourant = null;     // ligne en cours d'édition dans la modale
@@ -1491,29 +1516,73 @@ function libellePeriode(){
   return "toute la période";
 }
 
-function rendreChartAnnee(){
-  var cats = catsGraphiques();
-  var tot = {};
-  cats.forEach(function(c){ tot[c] = 0; });
-  lignesPeriode().forEach(function(l){
-    if(tot[l.categorie] === undefined) return;
-    if(l.montant > 0) tot[l.categorie] += l.montant;
+/* Lignes de la période, en respectant en plus « Exclure le non alimentaire »
+   (utile aux 3 dimensions du camembert, pas seulement à la vue Catégorie). */
+function lignesPourCamembert(){
+  return lignesPeriode().filter(function(l){
+    return !(exclureNonAlim && NON_ALIMENTAIRE.indexOf(l.categorie) !== -1);
   });
+}
+function changerVueCamembert(v){
+  vueCamembert = v;
+  Array.prototype.forEach.call(document.querySelectorAll("#vue-camembert-tabs button"), function(b){
+    b.classList.toggle("actif", b.getAttribute("data-vc") === v);
+  });
+  rendreChartAnnee();
+}
+
+function rendreChartAnnee(){
+  var base = lignesPourCamembert();
+  var tot = {}, ordre, couleurDe, libelleDim;
+
+  if(vueCamembert === "magasin"){
+    base.forEach(function(l){
+      if(l.montant <= 0) return;
+      var k = l.magasin || "—";
+      tot[k] = (tot[k] || 0) + l.montant;
+    });
+    ordre = Object.keys(tot).sort(function(a,b){ return tot[b] - tot[a]; });   // du plus dépensé au moins dépensé
+    couleurDe = couleurMagasin;
+    libelleDim = "magasin";
+  } else if(vueCamembert === "payeur"){
+    var payeParTicket = {};
+    tickets.forEach(function(t){ payeParTicket[t.id] = t.payePar || "Stéphanie"; });
+    tot = {"Stéphanie": 0, "Frédéric": 0};
+    base.forEach(function(l){
+      if(l.montant <= 0) return;
+      var k = payeParTicket[l.ticketId] || "Stéphanie";
+      tot[k] = (tot[k] || 0) + l.montant;
+    });
+    ordre = ["Stéphanie", "Frédéric"];
+    couleurDe = function(k){ return COULEURS_PAYEUR[k] || "#bbb"; };
+    libelleDim = "personne";
+  } else {
+    var cats = catsGraphiques();
+    cats.forEach(function(c){ tot[c] = 0; });
+    base.forEach(function(l){
+      if(tot[l.categorie] === undefined) return;
+      if(l.montant > 0) tot[l.categorie] += l.montant;
+    });
+    ordre = cats;   // ordre fixe des catégories
+    couleurDe = function(k){ return COULEURS[k] || "#bbb"; };
+    libelleDim = "catégorie";
+  }
+
   if(periodeSynthese === "moyenne"){
     // Cumul depuis la 1re dépense ramené à un mois moyen. Mise à l'échelle
     // uniforme : les parts et les % restent ceux du cumul complet.
     var jm = fenetreJours();
     var facteur = jm ? JOURS_PAR_MOIS / jm : 0;
-    cats.forEach(function(c){ tot[c] = tot[c] * facteur; });
+    ordre.forEach(function(k){ tot[k] = tot[k] * facteur; });
   }
   var garde = [];
-  cats.forEach(function(c){ if(tot[c] > 0) garde.push({c:c, v:tot[c]}); });   // ordre fixe des catégories, non nulles
+  ordre.forEach(function(k){ if(tot[k] > 0) garde.push({c:k, v:tot[k]}); });   // non nulles
   var grandTotal = garde.reduce(function(s,g){ return s + g.v; }, 0);
   var data = {
     labels: garde.map(function(g){ return g.c; }),
     datasets:[{
       data: garde.map(function(g){ return g.v; }),
-      backgroundColor: garde.map(function(g){ return COULEURS[g.c] || "#bbb"; }),
+      backgroundColor: garde.map(function(g){ return couleurDe(g.c); }),
       borderWidth:1, borderColor:"#fff"
     }]
   };
@@ -1539,7 +1608,7 @@ function rendreChartAnnee(){
     leg.innerHTML = garde.map(function(g){
       var pct = grandTotal ? Math.round(g.v / grandTotal * 100) : 0;
       return "<div class=\"lg-row\">" +
-        "<span class=\"lg-sw\" style=\"background:" + (COULEURS[g.c] || "#bbb") + "\"></span>" +
+        "<span class=\"lg-sw\" style=\"background:" + couleurDe(g.c) + "\"></span>" +
         "<span class=\"lg-nom\">" + echap(g.c) + "</span>" +
         "<span class=\"lg-val\">" + euros(g.v) + "</span>" +
         "<span class=\"lg-pct\">" + pct + " %</span></div>";
@@ -1551,8 +1620,8 @@ function rendreChartAnnee(){
   var pp = document.getElementById("periode-plage");
   if(pp) pp.textContent = texteePlage();
   document.getElementById("note-camembert").textContent = periodeSynthese === "moyenne"
-    ? "Dépense d'un mois moyen par catégorie" + suffixeExclusion() + "."
-    : "Part de chaque catégorie sur " + libellePeriode() + suffixeExclusion() + ".";
+    ? "Dépense d'un mois moyen par " + libelleDim + suffixeExclusion() + "."
+    : "Part de chaque " + libelleDim + " sur " + libellePeriode() + suffixeExclusion() + ".";
 }
 
 function fenetreJours(){
@@ -1722,6 +1791,7 @@ function montrerVue(v){
  *  Démarrage
  * ------------------------------------------------------------------ */
 window.montrerVue = montrerVue;
+window.changerVueCamembert = changerVueCamembert;
 window.montrerSousVue = montrerSousVue;
 window.ouvrirFormAjout = ouvrirFormAjout;
 window.fermerModale = fermerModale;

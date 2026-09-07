@@ -164,6 +164,8 @@
   #tbl-bc-postes select,#tbl-bc-ajust select{width:auto}
   #tbl-bc-postes tr.inactif{opacity:.45}
   #tbl-bc-postes input:disabled{background:var(--bg);color:var(--ink-soft);cursor:not-allowed}
+  .bc-verrouillable.verrou{opacity:.55}
+  #bc-cloture-hint{display:block;margin-top:6px;font-size:11px;color:var(--ink-soft);font-style:italic}
   .bc-resume{display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:var(--ink-soft)}
   .bc-resume b{color:var(--ink)}
   .bc-virement{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:15px;font-weight:600;text-align:center}
@@ -339,11 +341,12 @@
         </div>
       </label>
       <label class="ligne-nonalim" style="margin-top:12px">
-        <input type="checkbox" id="bc-cloture"> Mois clôturé
+        <input type="checkbox" id="bc-cloture" onchange="appliquerVerrouBudget()"> Mois clôturé
       </label>
+      <span id="bc-cloture-hint" style="display:none"></span>
     </div>
 
-    <div class="card">
+    <div class="card bc-verrouillable">
       <div class="barre-actions">
         <h2 style="margin:0">Dépenses partagées</h2>
         <button class="btn sec" onclick="ajouterPostePonctuel()">+ Poste ponctuel</button>
@@ -354,10 +357,10 @@
           <tbody></tbody>
         </table>
       </div>
-      <p class="note">Décoche un poste qui ne s'applique pas ce mois-ci (ex. Engie, payé un mois sur deux). Les lignes Courses sont calculées automatiquement depuis les tickets du mois (payés par chacun) : utilise « Vérifier » pour t'assurer que tout est saisi avant de valider.</p>
+      <p class="note">Décoche un poste qui ne s'applique pas ce mois-ci (ex. Engie, payé un mois sur deux). Les lignes Courses sont calculées automatiquement depuis les tickets du mois (payés par chacun).</p>
     </div>
 
-    <div class="card">
+    <div class="card bc-verrouillable">
       <div class="barre-actions">
         <h2 style="margin:0">Ajustements personnels</h2>
         <button class="btn sec" onclick="ajouterAjustement()">+ Ajustement</button>
@@ -1235,7 +1238,7 @@ function rendrePostes(){
             "</select>")) + "</td>" +
       "<td>" + (p.ponctuel
           ? "<button class=\"btn ghost\" data-bc-suppr-poste=\"" + i + "\" style=\"padding:4px 8px;font-size:11px\">✕</button>"
-          : (p.auto ? "<button type=\"button\" class=\"btn ghost\" data-bc-verif=\"" + i + "\" style=\"padding:4px 8px;font-size:11px\">Vérifier</button>" : "")) + "</td>" +
+          : "") + "</td>" +
     "</tr>";
   }).join("");
 
@@ -1270,24 +1273,46 @@ function rendrePostes(){
       rendrePostes(); recalculerBudget();
     });
   });
-  Array.prototype.forEach.call(tb.querySelectorAll("[data-bc-verif]"), function(b){
-    b.addEventListener("click", function(){
-      var p = budgetActuel.postes[+b.getAttribute("data-bc-verif")];
-      verifierTicketsCourses(budgetActuel.mois, p.payePar);
-    });
-  });
+  appliquerVerrouBudget();
 }
 
-/* Bascule vers Dépenses > Tickets, filtré sur le mois et le payeur du poste
-   Courses cliqué, pour vérifier que tous les tickets du mois sont saisis. */
-function verifierTicketsCourses(mois, payeur){
-  montrerVue("depenses");
-  montrerSousVue("tickets");
-  document.getElementById("ft-mois").value = mois;
-  document.getElementById("ft-magasin").value = "";
-  document.getElementById("ft-payepar").value = payeur;
-  document.getElementById("ft-nonpointe").checked = false;
-  rendreTickets();
+/* Verrou de clôture du mois.
+   - Case cochée mais mois pas encore enregistré comme clôturé : aperçu grisé
+     des cartes Dépenses partagées / Ajustements, mais la case et « Enregistrer »
+     restent actifs (on peut encore décocher).
+   - Mois enregistré avec cloture:true : verrou définitif, la case et
+     « Enregistrer » sont aussi désactivés. Seule la navigation entre mois reste
+     possible. */
+function appliquerVerrouBudget(){
+  var caseCloture = document.getElementById("bc-cloture");
+  var moisEnBase = budgetMois.filter(function(b){ return b.mois === (budgetActuel && budgetActuel.mois); })[0];
+  var clotureDefinitive = !!(moisEnBase && moisEnBase.cloture);
+  var apercu = caseCloture.checked;
+
+  Array.prototype.forEach.call(document.querySelectorAll("#vue-budget .bc-verrouillable"), function(carte){
+    carte.classList.toggle("verrou", apercu);
+    Array.prototype.forEach.call(carte.querySelectorAll("input, select, button"), function(el){
+      var montantAuto = el.hasAttribute("data-bc-montant") &&
+        budgetActuel && budgetActuel.postes[+el.getAttribute("data-bc-montant")] &&
+        budgetActuel.postes[+el.getAttribute("data-bc-montant")].auto;
+      el.disabled = apercu || !!montantAuto;
+    });
+  });
+
+  caseCloture.disabled = clotureDefinitive;
+  var btnEnr = document.getElementById("bc-enregistrer");
+  if(btnEnr) btnEnr.disabled = clotureDefinitive;
+
+  var hint = document.getElementById("bc-cloture-hint");
+  if(clotureDefinitive){
+    hint.textContent = "Mois clôturé, verrouillé définitivement.";
+    hint.style.display = "block";
+  } else if(apercu){
+    hint.textContent = "Les modifications seront verrouillées après enregistrement.";
+    hint.style.display = "block";
+  } else {
+    hint.style.display = "none";
+  }
 }
 
 function rendreAjustements(){
@@ -1296,6 +1321,7 @@ function rendreAjustements(){
   if(!budgetActuel.ajustements.length){
     tb.innerHTML = "";
     vide.style.display = "block";
+    appliquerVerrouBudget();
     return;
   }
   vide.style.display = "none";
@@ -1334,6 +1360,7 @@ function rendreAjustements(){
       rendreAjustements(); recalculerBudget();
     });
   });
+  appliquerVerrouBudget();
 }
 
 function ajouterPostePonctuel(){
@@ -1394,16 +1421,25 @@ function recalculerBudget(){
 function enregistrerBudgetActuel(){
   if(budgetIndispo){ toast("Collection « budgetCouple » pas encore autorisée côté Firestore."); return; }
   if(!budgetActuel || !budgetActuel.mois){ toast("Choisis d'abord un mois."); return; }
-  budgetActuel.cloture = document.getElementById("bc-cloture").checked;
+  var veutCloturer = document.getElementById("bc-cloture").checked;
+  var dejaCloture = budgetMois.filter(function(b){ return b.mois === budgetActuel.mois; })[0];
+  dejaCloture = !!(dejaCloture && dejaCloture.cloture);
+  if(veutCloturer && !dejaCloture){
+    if(!confirm("Tu clôtures " + moisLisible(budgetActuel.mois) + ".\n\nAprès enregistrement, plus aucune modification ne sera possible sur ce mois.\n\nContinuer ?")) return;
+  }
+  budgetActuel.cloture = veutCloturer;
   var btn = document.getElementById("bc-enregistrer");
   btn.disabled = true; btn.textContent = "…";
+  var moisEnr = budgetActuel.mois;
   enregistrerBudget(budgetActuel).then(chargerBudget).then(function(){
+    chargerMoisEnEdition(moisEnr);   // recharge depuis le cache à jour : applique le verrou si le mois vient d'être clôturé
     rendreHistoriqueBudget();
     toast("Mois enregistré.");
   }).catch(function(e){
     banniere("Échec de l'enregistrement : " + e.message);
   }).then(function(){
-    btn.disabled = false; btn.textContent = "Enregistrer";
+    btn.textContent = "Enregistrer";
+    appliquerVerrouBudget();   // laisse le verrou décider si le bouton reste désactivé (mois clôturé)
   });
 }
 
@@ -1873,6 +1909,7 @@ window.moisBudgetDecal = moisBudgetDecal;
 window.ajouterPostePonctuel = ajouterPostePonctuel;
 window.ajouterAjustement = ajouterAjustement;
 window.enregistrerBudgetActuel = enregistrerBudgetActuel;
+window.appliquerVerrouBudget = appliquerVerrouBudget;
 
 document.getElementById("overlay").addEventListener("click", function(e){
   if(e.target === this) fermerModale();

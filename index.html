@@ -157,6 +157,8 @@
   tr.tk-detail table{margin:0}
   tr.tk-detail th,tr.tk-detail td{border-bottom:1px solid var(--line);font-size:12.5px}
   tr.tk-detail tr:last-child td{border-bottom:none}
+  .tk-note{display:inline-block;max-width:min(320px,42vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+  tr.tk-detail td.tk-note-full{white-space:normal;padding:10px;color:var(--ink-soft);font-size:12px;background:var(--accent-soft)}
   .tk-pointe td{color:var(--ink-soft)}
   #tbl-bc-postes td,#tbl-bc-ajust td{white-space:normal;vertical-align:middle}
   #tbl-bc-postes input[type=text],#tbl-bc-ajust input[type=text]{width:100%}
@@ -994,7 +996,7 @@ function rendreTickets(){
       "<tr class=\"tk-ligne" + (t.pointe ? " tk-pointe" : "") + (ouvert ? " ouvert" : "") + "\" data-id=\"" + t.id + "\">" +
         "<td class=\"tk-check\"><input type=\"checkbox\" data-pointe=\"" + t.id + "\"" + (t.pointe ? " checked" : "") + "></td>" +
         "<td>" + fmtDate(t.date) + "</td>" +
-        "<td>" + echap(t.magasin) + (t.note ? " <span class=\"note\" style=\"margin:0\">· " + echap(t.note) + "</span>" : "") + "</td>" +
+        "<td>" + echap(t.magasin) + (t.note ? " <span class=\"note tk-note\" style=\"margin:0\" title=\"" + echap(t.note) + "\">· " + echap(t.note) + "</span>" : "") + "</td>" +
         "<td class=\"tk-paye\">" + ((t.payePar || "Stéphanie") === "Frédéric" ? "F" : "S") + "</td>" +
         "<td class=\"montant\">" + euros(t.total) + "</td>" +
       "</tr>";
@@ -1007,7 +1009,10 @@ function rendreTickets(){
           }).join("")
         : "<tr><td colspan=\"3\" class=\"vide\" style=\"padding:14px\">Aucune ligne rattachée à ce ticket.</td></tr>";
       var sommeTk = lignesTk.reduce(function(s,l){ return s + l.montant; }, 0);
-      rangee += "<tr class=\"tk-detail\"><td colspan=\"5\"><table><tbody>" + corps +
+      var noteRow = t.note
+        ? "<tr><td colspan=\"3\" class=\"tk-note-full\">" + echap(t.note) + "</td></tr>"
+        : "";
+      rangee += "<tr class=\"tk-detail\"><td colspan=\"5\"><table><tbody>" + noteRow + corps +
         "<tr><td></td><td style=\"text-align:right;color:var(--ink-soft)\">Somme des lignes</td>" +
         "<td class=\"montant\" style=\"color:var(--ink-soft)\">" + euros(sommeTk) + "</td></tr>" +
         "<tr><td colspan=\"3\" style=\"text-align:right\">" +
@@ -1507,7 +1512,7 @@ function rendreSynthese(){
   var note = document.getElementById("note-bilan");
   var prefixe = exclureNonAlim ? "Non alimentaire exclu (« " + NON_ALIMENTAIRE.join(" », « ") + " »). " : "";
   note.textContent = prefixe +
-    "Moyenne journalière : total divisé par le nombre de jours écoulés depuis la première dépense (mois en cours inclus). " +
+    "Moyenne journalière : total divisé par le nombre de jours entre la première dépense enregistrée et aujourd'hui. " +
     "Moyenne mensuelle : cette moyenne journalière × 30,417 (nombre moyen de jours par mois), même base.";
 }
 
@@ -1722,16 +1727,20 @@ function rendreChartAnnee(){
 }
 
 function fenetreJours(){
-  // Nombre de jours de la 1re à la dernière dépense enregistrée (mois en cours
-  // inclus), même périmètre que le Bilan. Base commune à la moyenne journalière,
-  // à la moyenne mensuelle et au mode « En moyenne » du camembert.
+  // Nombre de jours de la 1re dépense enregistrée à aujourd'hui, bornes incluses.
+  // Même périmètre que le Bilan. Base commune à la moyenne journalière, à la
+  // moyenne mensuelle et au mode « En moyenne » du camembert. Si une dépense est
+  // datée dans le futur, on va jusqu'à elle (la fenêtre ne peut pas être plus
+  // courte que l'étendue réelle des données).
   var dates = lignes.filter(function(l){
     if(exclureNonAlim && NON_ALIMENTAIRE.indexOf(l.categorie) !== -1) return false;
     return !!l.date;
   }).map(function(l){ return l.date; }).sort();
   if(!dates.length) return 0;
   var d1 = new Date(dates[0] + "T00:00:00");
-  var d2 = new Date(dates[dates.length - 1] + "T00:00:00");
+  var derniere = dates[dates.length - 1];
+  var fin = derniere > aujourdHui() ? derniere : aujourdHui();
+  var d2 = new Date(fin + "T00:00:00");
   return Math.round((d2 - d1) / 86400000) + 1;
 }
 

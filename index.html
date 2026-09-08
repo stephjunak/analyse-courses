@@ -137,6 +137,12 @@
   .champ span{font-size:11.5px;color:var(--ink-soft)}
   .champ input:disabled,.champ select:disabled{background:var(--bg);color:var(--ink-soft);cursor:not-allowed}
   .champ .indice{font-size:11px;color:var(--ink-soft);font-style:italic}
+  .tl-ligne{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px}
+  .tl-ligne input,.tl-ligne select{width:100%}
+  .tl-bas{display:flex;gap:6px}
+  .tl-bas .tl-cat{flex:1;min-width:0}
+  .tl-bas .tl-prix{width:84px;flex:none}
+  .tl-suppr{flex:none;width:34px;border:1px solid var(--line);background:var(--card);border-radius:8px;cursor:pointer;color:var(--ink-soft);font-size:13px}
   .modale-actions{display:flex;gap:8px;margin-top:6px}
   .modale-actions .btn{flex:1}
   .banniere{background:#fdeeea;border:1px solid var(--danger);color:var(--danger);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:none}
@@ -440,7 +446,15 @@
     <div class="champ"><span>Magasin</span>
       <input type="text" id="t-magasin" list="liste-magasins" autocomplete="off">
     </div>
-    <div class="champ"><span>Total payé (€)</span><input type="number" id="t-total" step="0.01" inputmode="decimal"></div>
+    <div class="champ"><span>Total payé (€)</span><input type="number" id="t-total" step="0.01" inputmode="decimal">
+      <span class="indice" id="t-total-indice" style="display:none">Se calcule depuis les lignes du ticket. Pour le changer, modifie les lignes.</span>
+    </div>
+    <div class="champ">
+      <span id="t-lignes-label">Lignes (facultatif)</span>
+      <div id="t-lignes"></div>
+      <button type="button" class="btn ghost" id="t-ajout-ligne" style="align-self:flex-start;font-size:12.5px;padding:6px 10px">+ Ligne</button>
+      <span class="indice" id="t-lignes-somme" style="display:none"></span>
+    </div>
     <div class="champ"><span>Qui a payé</span>
       <select id="t-payepar"><option value="Stéphanie">Stéphanie</option><option value="Frédéric">Frédéric</option></select>
     </div>
@@ -747,6 +761,20 @@ function supprimerTicketDoux(id){
     method:"PATCH", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({fields:{supprime:{booleanValue:true}}})
   }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+/* Le total d'un ticket suit toujours la somme de ses lignes actives : on le
+   recale après toute suppression / modification de ligne rattachée. */
+function majTotalTicket(id, total){
+  var mask = "updateMask.fieldPaths=total";
+  return fetch(BASE_T + "/" + id + "?" + mask + "&key=" + FB_API_KEY, {
+    method:"PATCH", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fields:{total:{doubleValue: Math.round(total * 100) / 100}}})
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+function sommeLignesTicket(ticketId, saufId){
+  return Math.round(lignes.filter(function(l){
+    return l.ticketId === ticketId && !l.supprime && l.id !== saufId;
+  }).reduce(function(s, l){ return s + l.montant; }, 0) * 100) / 100;
 }
 
 /* --- Budget couple --- */
@@ -1056,6 +1084,71 @@ function basculerPointe(id, val){
 }
 
 /* Modale ticket */
+function optionsCategoriesLigne(sel){
+  return CATEGORIES.filter(function(c){ return c !== CATEGORIE_NON_DETAILLEE; })
+    .map(function(c){
+      return "<option value=\"" + echap(c) + "\"" + (c === sel ? " selected" : "") + ">" + echap(c) + "</option>";
+    }).join("");
+}
+function viderLignesTicket(){
+  document.getElementById("t-lignes").innerHTML = "";
+  document.getElementById("t-lignes-somme").style.display = "none";
+}
+function ajouterLigneTicket(pref){
+  pref = pref || {};
+  var wrap = document.createElement("div");
+  wrap.className = "tl-ligne";
+  wrap.innerHTML =
+    "<input type=\"text\" class=\"tl-article\" placeholder=\"Article\" autocomplete=\"off\">" +
+    "<div class=\"tl-bas\">" +
+      "<select class=\"tl-cat\">" + optionsCategoriesLigne(pref.categorie || "Fruits et légumes") + "</select>" +
+      "<input type=\"number\" class=\"tl-prix\" step=\"0.01\" inputmode=\"decimal\" placeholder=\"Prix €\">" +
+      "<button type=\"button\" class=\"tl-suppr\" aria-label=\"Retirer la ligne\">✕</button>" +
+    "</div>";
+  if(pref.article != null) wrap.querySelector(".tl-article").value = pref.article;
+  if(pref.montant != null) wrap.querySelector(".tl-prix").value = pref.montant;
+  wrap.querySelector(".tl-suppr").addEventListener("click", function(){
+    wrap.remove(); majEtatLignesTicket();
+  });
+  wrap.querySelector(".tl-prix").addEventListener("input", majEtatLignesTicket);
+  document.getElementById("t-lignes").appendChild(wrap);
+  wrap.querySelector(".tl-article").focus();
+  majEtatLignesTicket();
+}
+function lignesTicketSaisies(){
+  return [].slice.call(document.querySelectorAll("#t-lignes .tl-ligne")).map(function(row){
+    return {
+      article: row.querySelector(".tl-article").value.trim(),
+      categorie: row.querySelector(".tl-cat").value,
+      montant: parseFloat(String(row.querySelector(".tl-prix").value).replace(",", "."))
+    };
+  });
+}
+/* Somme des lignes saisies + bascule du champ « Total payé » : en création, dès
+   qu'une ligne valide est saisie, le total suit cette somme (champ verrouillé). */
+function majEtatLignesTicket(){
+  var rows = lignesTicketSaisies();
+  var valides = rows.filter(function(r){ return !isNaN(r.montant) && r.montant > 0; });
+  var somme = Math.round(valides.reduce(function(s, r){ return s + r.montant; }, 0) * 100) / 100;
+  var elSomme = document.getElementById("t-lignes-somme");
+  if(rows.length){
+    elSomme.style.display = "";
+    elSomme.textContent = "Somme des lignes : " + euros(somme);
+  } else {
+    elSomme.style.display = "none";
+  }
+  if(!idTicketCourant){
+    var champ = document.getElementById("t-total");
+    if(valides.length){
+      champ.value = somme.toFixed(2);
+      champ.disabled = true;
+      document.getElementById("t-total-indice").style.display = "";
+    } else {
+      champ.disabled = false;
+      document.getElementById("t-total-indice").style.display = "none";
+    }
+  }
+}
 function ouvrirFormTicket(){
   if(ticketsIndispo){ toast("Collection « tickets » pas encore autorisée côté Firestore."); return; }
   idTicketCourant = null;
@@ -1063,10 +1156,14 @@ function ouvrirFormTicket(){
   document.getElementById("t-date").value = aujourdHui();
   document.getElementById("t-magasin").value = "";
   document.getElementById("t-total").value = "";
+  document.getElementById("t-total").disabled = false;
+  document.getElementById("t-total-indice").style.display = "none";
   document.getElementById("t-payepar").value = "Stéphanie";
   document.getElementById("t-note").value = "";
   document.getElementById("t-pointe").checked = false;
   document.getElementById("ticket-suppr").style.display = "none";
+  document.getElementById("t-lignes-label").textContent = "Lignes (facultatif)";
+  viderLignesTicket();
   document.getElementById("overlay-ticket").classList.add("on");
   document.getElementById("t-magasin").focus();
 }
@@ -1077,15 +1174,30 @@ function ouvrirFormTicketModif(id){
   document.getElementById("modale-ticket-titre").textContent = "Modifier le ticket";
   document.getElementById("t-date").value = t.date;
   document.getElementById("t-magasin").value = t.magasin;
-  document.getElementById("t-total").value = t.total;
+  var lignesTk = lignes.filter(function(l){ return l.ticketId === id && !l.supprime; });
+  var detaille = lignesTk.length > 1 ||
+    (lignesTk.length === 1 && lignesTk[0].categorie !== CATEGORIE_NON_DETAILLEE);
+  var champTotal = document.getElementById("t-total");
+  if(detaille){
+    var somme = lignesTk.reduce(function(s, l){ return s + l.montant; }, 0);
+    champTotal.value = (Math.round(somme * 100) / 100).toFixed(2);
+    champTotal.disabled = true;
+  } else {
+    champTotal.value = t.total;
+    champTotal.disabled = false;
+  }
+  document.getElementById("t-total-indice").style.display = detaille ? "" : "none";
   document.getElementById("t-payepar").value = t.payePar || "Stéphanie";
   document.getElementById("t-note").value = t.note;
   document.getElementById("t-pointe").checked = t.pointe;
   document.getElementById("ticket-suppr").style.display = "flex";
+  document.getElementById("t-lignes-label").textContent = "Ajouter des lignes (facultatif)";
+  viderLignesTicket();
   document.getElementById("overlay-ticket").classList.add("on");
 }
 function fermerModaleTicket(){
   document.getElementById("overlay-ticket").classList.remove("on");
+  viderLignesTicket();
   idTicketCourant = null;
 }
 function lireModaleTicket(){
@@ -1102,32 +1214,84 @@ function validerModaleTicket(){
   var o = lireModaleTicket();
   if(!o.date){ toast("Il manque la date."); return; }
   if(!o.magasin){ toast("Il manque le magasin."); return; }
-  if(isNaN(o.total)){ toast("Total invalide."); return; }
+
+  var rows = lignesTicketSaisies();
+  for(var i = 0; i < rows.length; i++){
+    var r = rows[i];
+    if(!r.article && isNaN(r.montant)) continue;   // ligne totalement vide : ignorée
+    if(isNaN(r.montant) || r.montant <= 0){
+      toast("Ligne " + (i + 1) + " : prix manquant ou invalide."); return;
+    }
+  }
+  var nouvelles = rows.filter(function(r){ return !isNaN(r.montant) && r.montant > 0; });
+  var sommeNouvelles = Math.round(nouvelles.reduce(function(s, r){ return s + r.montant; }, 0) * 100) / 100;
+  if(!nouvelles.length && isNaN(o.total)){ toast("Total invalide."); return; }
+
   var btn = document.getElementById("t-valider");
   btn.disabled = true; btn.textContent = "…";
+  var ajoutsLignes = function(tid){
+    return nouvelles.map(function(r){
+      return ajouter({ date: o.date, magasin: o.magasin, categorie: r.categorie,
+        article: r.article || r.categorie, montant: r.montant, source: "ticket", ticketId: tid });
+    });
+  };
   var p;
+
   if(idTicketCourant){
     var ancien = tickets.filter(function(x){ return x.id === idTicketCourant; })[0] || {};
-    var bougeDate = o.date !== ancien.date;
-    var bougeMag  = o.magasin !== ancien.magasin;
-    var bougeTotal = o.total !== ancien.total;
-    var lignesTk = lignes.filter(function(l){ return l.ticketId === idTicketCourant; });
-    // seul cas où le montant se répercute sur la ligne : un ticket resté
-    // « Non catégorisé » (pas encore détaillé). Un ticket réellement détaillé
-    // n'a pas de contrôle d'écart somme-des-lignes vs total (voir README).
+    var lignesTk = lignes.filter(function(l){ return l.ticketId === idTicketCourant && !l.supprime; });
     var seuleNonCat = lignesTk.length === 1 && lignesTk[0].categorie === CATEGORIE_NON_DETAILLEE;
-    // la date et le magasin vivent sur le ticket : on les répercute sur ses lignes
-    var majLignes = (bougeDate || bougeMag || (bougeTotal && seuleNonCat))
-      ? lignesTk.map(function(l){
-          return modifier(l.id, {
-            date: o.date, magasin: o.magasin,
-            categorie: l.categorie, article: l.article,
-            montant: (bougeTotal && seuleNonCat) ? o.total : l.montant,
-            source: l.source, ticketId: l.ticketId, supprime: l.supprime
-          });
-        })
-      : [];
-    p = modifierTicket(idTicketCourant, o).then(function(){ return Promise.all(majLignes); });
+    var detaille = lignesTk.length && !seuleNonCat;
+    var vrac = seuleNonCat ? lignesTk[0] : null;
+    var bougeDM = (o.date !== ancien.date) || (o.magasin !== ancien.magasin);
+    var ops = [];
+    // lignes existantes hors « vrac » : propager date / magasin si changés
+    lignesTk.forEach(function(l){
+      if(vrac && l.id === vrac.id) return;
+      if(bougeDM){
+        ops.push(modifier(l.id, { date: o.date, magasin: o.magasin,
+          categorie: l.categorie, article: l.article, montant: l.montant,
+          source: l.source, ticketId: l.ticketId, supprime: l.supprime }));
+      }
+    });
+    var totalFinal;
+    if(nouvelles.length){
+      ops = ops.concat(ajoutsLignes(idTicketCourant));
+      if(vrac){
+        // « découper le vrac » : le Non catégorisé diminue de la somme ajoutée
+        var voulu = isNaN(o.total) ? vrac.montant : o.total;
+        var reste = Math.round((voulu - sommeNouvelles) * 100) / 100;
+        if(reste > 0.004){
+          ops.push(modifier(vrac.id, { date: o.date, magasin: o.magasin,
+            categorie: vrac.categorie, article: vrac.article, montant: reste,
+            source: vrac.source, ticketId: vrac.ticketId, supprime: false }));
+          totalFinal = Math.round((reste + sommeNouvelles) * 100) / 100;
+        } else {
+          ops.push(supprimerDoux(vrac.id));
+          totalFinal = sommeNouvelles;
+        }
+      } else {
+        var base = Math.round(lignesTk.reduce(function(s, l){ return s + l.montant; }, 0) * 100) / 100;
+        totalFinal = Math.round((base + sommeNouvelles) * 100) / 100;
+      }
+    } else if(vrac){
+      var m = isNaN(o.total) ? vrac.montant : o.total;
+      if(m !== vrac.montant || bougeDM){
+        ops.push(modifier(vrac.id, { date: o.date, magasin: o.magasin,
+          categorie: vrac.categorie, article: vrac.article, montant: m,
+          source: vrac.source, ticketId: vrac.ticketId, supprime: false }));
+      }
+      totalFinal = m;
+    } else if(detaille){
+      totalFinal = Math.round(lignesTk.reduce(function(s, l){ return s + l.montant; }, 0) * 100) / 100;
+    } else {
+      totalFinal = isNaN(o.total) ? (ancien.total || 0) : o.total;
+    }
+    o.total = totalFinal;
+    p = modifierTicket(idTicketCourant, o).then(function(){ return Promise.all(ops); });
+  } else if(nouvelles.length){
+    o.total = sommeNouvelles;
+    p = ajouterTicket(o).then(function(tid){ return Promise.all(ajoutsLignes(tid)); });
   } else {
     // un ticket créé sans détail est compté en entier dans « Non catégorisé »,
     // pour que le total reste juste tant qu'il n'est pas détaillé
@@ -1138,6 +1302,7 @@ function validerModaleTicket(){
       });
     });
   }
+
   p.then(charger).then(function(){
     fermerModaleTicket();
     remplirFiltres(); rendreTickets(); rendreDepenses(); rendreSynthese();
@@ -1150,12 +1315,15 @@ function validerModaleTicket(){
 }
 function supprimerTicketCourant(){
   if(!idTicketCourant) return;
-  var lignesTk = lignes.filter(function(l){ return l.ticketId === idTicketCourant; }).length;
-  var msg = lignesTk
-    ? "Supprimer ce ticket ? Ses " + lignesTk + " ligne(s) restent dans le suivi mais ne seront plus rattachées à un ticket."
+  var idsLignes = lignes.filter(function(l){ return l.ticketId === idTicketCourant; })
+                        .map(function(l){ return l.id; });
+  var msg = idsLignes.length
+    ? "Supprimer ce ticket et ses " + idsLignes.length + " ligne(s) de dépense ?"
     : "Supprimer ce ticket ?";
   if(!confirm(msg)) return;
-  supprimerTicketDoux(idTicketCourant).then(charger).then(function(){
+  Promise.all([supprimerTicketDoux(idTicketCourant)].concat(
+    idsLignes.map(function(id){ return supprimerDoux(id); })
+  )).then(charger).then(function(){
     ticketOuvert = null;
     fermerModaleTicket();
     remplirFiltres(); rendreTickets();
@@ -1842,6 +2010,10 @@ function validerModale(){
     o.source = actu.source || "manuel";
     o.ticketId = actu.ticketId || "";
     p = modifier(idCourant, o);
+    if(o.ticketId){
+      var nouveauTotal = Math.round((sommeLignesTicket(o.ticketId, idCourant) + o.montant) * 100) / 100;
+      p = p.then(function(){ return majTotalTicket(o.ticketId, nouveauTotal); });
+    }
   } else {
     o.source = "manuel";
     if(ticketsIndispo){
@@ -1867,7 +2039,12 @@ function validerModale(){
 function supprimerCourant(){
   if(!idCourant) return;
   if(!confirm("Supprimer cette ligne ? Elle n'apparaîtra plus dans le suivi.")) return;
+  var l = lignes.filter(function(x){ return x.id === idCourant; })[0];
+  var tid = l && l.ticketId;
+  var nouveauTotal = tid ? sommeLignesTicket(tid, idCourant) : null;
   supprimerDoux(idCourant).then(function(){
+    return tid ? majTotalTicket(tid, nouveauTotal) : null;
+  }).then(function(){
     return charger();
   }).then(function(){
     fermerModale();
@@ -1926,6 +2103,7 @@ document.getElementById("overlay").addEventListener("click", function(e){
 document.getElementById("overlay-ticket").addEventListener("click", function(e){
   if(e.target === this) fermerModaleTicket();
 });
+document.getElementById("t-ajout-ligne").addEventListener("click", function(){ ajouterLigneTicket(); });
 
 /* Filtre de période du camembert (Synthèse) */
 (function(){

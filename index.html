@@ -516,12 +516,15 @@ var CATEGORIES = [
 var CATEGORIE_NON_DETAILLEE = "Non catégorisé";
 var NON_ALIMENTAIRE = ["Droguerie/Hygiène"];
 /* Postes fixes du Budget couple, pré-remplis chaque mois (décochables si le
-   poste ne s'applique pas ce mois-ci, ex. Engie payé un mois sur deux). */
+   poste ne s'applique pas ce mois-ci, ex. Engie payé un mois sur deux).
+   Un nouveau mois reprend montant, payé par et case cochée du dernier mois
+   enregistré, sauf le montant des postes auto (calculé) et des postes
+   montantVariable (à ressaisir chaque mois). */
 var POSTES_FIXES = [
   {nom: "Courses (Stéphanie)", payePar: "Stéphanie", auto: true},
   {nom: "Courses (Frédéric)", payePar: "Frédéric", auto: true},
   {nom: "Loyer", payePar: "Frédéric"},
-  {nom: "Engie", payePar: "Frédéric"},
+  {nom: "Engie", payePar: "Frédéric", montantVariable: true},
   {nom: "Internet", payePar: "Frédéric"},
   {nom: "Canal+", payePar: "Frédéric"},
   {nom: "Assurance habitation", payePar: "Frédéric"}
@@ -1361,12 +1364,27 @@ function supprimerTicketCourant(){
 /* ------------------------------------------------------------------ *
  *  Vue Budget couple
  * ------------------------------------------------------------------ */
-function moisParDefautBudget(){
+/* Dernier mois enregistré strictement avant `mois` (null s'il n'y en a pas). */
+function dernierMoisEnregistreAvant(mois){
+  return budgetMois
+    .filter(function(b){ return b.mois < mois; })
+    .sort(function(a,b){ return a.mois < b.mois ? 1 : -1; })[0] || null;
+}
+function moisParDefautBudget(mois){
+  var precedent = mois ? dernierMoisEnregistreAvant(mois) : null;
   return {
-    mois: "",
+    mois: mois || "",
     cloture: false,
     postes: POSTES_FIXES.map(function(p){
-      return {nom:p.nom, montant:0, payePar:p.payePar, actif:true, ponctuel:false, auto:!!p.auto};
+      var prec = precedent && precedent.postes.filter(function(q){ return !q.ponctuel && q.nom === p.nom; })[0];
+      return {
+        nom: p.nom,
+        montant: (prec && !p.auto && !p.montantVariable) ? (Number(prec.montant) || 0) : 0,
+        payePar: prec ? prec.payePar : p.payePar,
+        actif: prec ? prec.actif : true,
+        ponctuel: false,
+        auto: !!p.auto
+      };
     }),
     ajustements: [],
     commentaire: ""
@@ -1398,7 +1416,7 @@ function chargerMoisEnEdition(mois){
   var existant = budgetMois.filter(function(b){ return b.mois === mois; })[0];
   budgetActuel = existant
     ? JSON.parse(JSON.stringify(existant))       // clone : ne pas modifier le cache avant l'enregistrement
-    : Object.assign(moisParDefautBudget(), {mois: mois});
+    : moisParDefautBudget(mois);
   document.getElementById("bc-cloture").checked = !!budgetActuel.cloture;
   document.getElementById("bc-commentaire").value = budgetActuel.commentaire || "";
   rendrePostes();

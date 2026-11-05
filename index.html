@@ -533,6 +533,13 @@ var POSTES_FIXES = [
    moyenne journalière à une base mensuelle : moyenne mensuelle = moyenne
    journalière × JOURS_PAR_MOIS. */
 var JOURS_PAR_MOIS = 30.417;
+/* Périodes d'absence (bornes incluses, "AAAA-MM-JJ") : aucune dépense ces
+   jours-là, donc retirés du nombre de jours des moyennes (Bilan et camembert
+   « En moyenne »). Totaux, histogramme et Budget couple n'en tiennent pas
+   compte. Une ligne par absence. */
+var ABSENCES = [
+  {du: "2026-09-23", au: "2026-10-31"}   // chez les parents de Stéphanie
+];
 /* Palette « design-system.md » (option 6a), en oklch pour un contraste perçu
    régulier d'une teinte à l'autre. « Épicerie/Condiments » porte la couleur
    « Condiments » du nuancier ; « Dessert » (absente du nuancier) reçoit un
@@ -1747,7 +1754,10 @@ function rendreSynthese(){
   var prefixe = exclureNonAlim ? "Non alimentaire exclu (« " + NON_ALIMENTAIRE.join(" », « ") + " »). " : "";
   note.textContent = prefixe +
     "Moyenne journalière : total divisé par le nombre de jours entre la première dépense enregistrée et aujourd'hui. " +
-    "Moyenne mensuelle : cette moyenne journalière × 30,417 (nombre moyen de jours par mois), même base.";
+    "Moyenne mensuelle : cette moyenne journalière × 30,417 (nombre moyen de jours par mois), même base." +
+    (ABSENCES.length ? " Hors absences : " + ABSENCES.map(function(a){
+      return dateCourte(a.du) + " → " + dateCourte(a.au) + " (" + joursAbsence(a.du, a.au) + " jours)";
+    }).join(", ") + "." : "");
 }
 
 function catsGraphiques(){
@@ -1975,7 +1985,21 @@ function fenetreJours(){
   var derniere = dates[dates.length - 1];
   var fin = derniere > aujourdHui() ? derniere : aujourdHui();
   var d2 = new Date(fin + "T00:00:00");
-  return Math.round((d2 - d1) / 86400000) + 1;
+  return Math.round((d2 - d1) / 86400000) + 1 - joursAbsence(dates[0], fin);
+}
+/* Jours d'absence compris entre debut et fin (chaînes "AAAA-MM-JJ", bornes
+   incluses), pour ne compter que la partie des absences dans la fenêtre. */
+function joursAbsence(debut, fin){
+  return ABSENCES.reduce(function(n, a){
+    var du = a.du > debut ? a.du : debut;
+    var au = a.au < fin ? a.au : fin;
+    if(du > au) return n;
+    return n + Math.round((new Date(au + "T00:00:00") - new Date(du + "T00:00:00")) / 86400000) + 1;
+  }, 0);
+}
+function dateCourte(iso){
+  var p = iso.split("-");
+  return p[2] + "/" + p[1] + "/" + p[0];
 }
 
 function rendreBilan(a){

@@ -178,6 +178,7 @@
   .bc-resume b{color:var(--ink)}
   .bc-virement{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--accent-soft);color:var(--accent);font-size:15px;font-weight:600;text-align:center}
   .bc-ligne-actions{display:flex;justify-content:flex-end;margin-top:12px}
+  #bc-commentaire{font:inherit;font-size:14px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%;min-height:76px;resize:vertical}
   #tbl-bc-histo tr.modifiable td{color:var(--ink)}
   .bc-nav-mois{display:flex;align-items:center;gap:6px}
   .bc-nav-mois input{flex:1;text-align:center}
@@ -394,6 +395,15 @@
       <div class="bc-virement" id="bc-virement">—</div>
       <div class="bc-ligne-actions">
         <button class="btn" id="bc-enregistrer" onclick="enregistrerBudgetActuel()">Enregistrer</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Commentaire</h2>
+      <textarea id="bc-commentaire" placeholder="Ex. virement fait à Frédéric le 03/11, resto du 12 non compté…"></textarea>
+      <p class="note" id="bc-commentaire-note">Enregistré avec le mois (bouton « Enregistrer » ci-dessus).</p>
+      <div class="bc-ligne-actions" id="bc-commentaire-actions" style="display:none">
+        <button class="btn sec" id="bc-enr-commentaire" onclick="enregistrerCommentaireBudget()">Enregistrer le commentaire</button>
       </div>
     </div>
 
@@ -805,6 +815,7 @@ function versChampsBudget(o){
     cloture:     {booleanValue: !!o.cloture},
     postes:      {arrayValue:{values: (o.postes || []).map(posteVersMapValue)}},
     ajustements: {arrayValue:{values: (o.ajustements || []).map(ajustementVersMapValue)}},
+    commentaire: {stringValue: o.commentaire || ""},
     majLe:       {stringValue: new Date().toISOString()}
   };
 }
@@ -835,6 +846,7 @@ function depuisDocBudget(d){
     cloture: valChamp(f.cloture) === true,
     postes: ((f.postes && f.postes.arrayValue && f.postes.arrayValue.values) || []).map(posteDepuisMapValue),
     ajustements: ((f.ajustements && f.ajustements.arrayValue && f.ajustements.arrayValue.values) || []).map(ajustementDepuisMapValue),
+    commentaire: valChamp(f.commentaire) || "",
     majLe: valChamp(f.majLe) || ""
   };
 }
@@ -856,11 +868,24 @@ function chargerBudget(){
 }
 function enregistrerBudget(o){
   // PATCH sur un id connu = upsert Firestore (crée le document s'il n'existe pas encore)
-  var champs = ["mois","cloture","postes","ajustements","majLe"];
+  var champs = ["mois","cloture","postes","ajustements","commentaire","majLe"];
   var mask = champs.map(function(c){ return "updateMask.fieldPaths=" + c; }).join("&");
   return fetch(BASE_BC + "/" + encodeURIComponent(o.mois) + "?" + mask + "&key=" + FB_API_KEY, {
     method:"PATCH", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({fields: versChampsBudget(o)})
+  }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+}
+/* N'écrit que le commentaire (et majLe) : sert aux mois clôturés, dont le
+   reste est figé. Le masque garantit que cloture, postes et ajustements ne
+   sont pas touchés. */
+function enregistrerCommentaire(mois, texte){
+  var mask = "updateMask.fieldPaths=commentaire&updateMask.fieldPaths=majLe";
+  return fetch(BASE_BC + "/" + encodeURIComponent(mois) + "?" + mask + "&currentDocument.exists=true&key=" + FB_API_KEY, {
+    method:"PATCH", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({fields: {
+      commentaire: {stringValue: texte || ""},
+      majLe:       {stringValue: new Date().toISOString()}
+    }})
   }).then(function(r){ if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
 }
 
@@ -1343,7 +1368,8 @@ function moisParDefautBudget(){
     postes: POSTES_FIXES.map(function(p){
       return {nom:p.nom, montant:0, payePar:p.payePar, actif:true, ponctuel:false, auto:!!p.auto};
     }),
-    ajustements: []
+    ajustements: [],
+    commentaire: ""
   };
 }
 /* Courses payées par chacun sur un mois donné, calculées depuis les vraies
@@ -1374,6 +1400,7 @@ function chargerMoisEnEdition(mois){
     ? JSON.parse(JSON.stringify(existant))       // clone : ne pas modifier le cache avant l'enregistrement
     : Object.assign(moisParDefautBudget(), {mois: mois});
   document.getElementById("bc-cloture").checked = !!budgetActuel.cloture;
+  document.getElementById("bc-commentaire").value = budgetActuel.commentaire || "";
   rendrePostes();
   rendreAjustements();
   recalculerBudget();
@@ -1475,6 +1502,9 @@ function appliquerVerrouBudget(){
   caseCloture.disabled = clotureDefinitive;
   var btnEnr = document.getElementById("bc-enregistrer");
   if(btnEnr) btnEnr.disabled = clotureDefinitive;
+  // Le commentaire échappe au verrou : sur un mois clôturé, il a son propre bouton.
+  document.getElementById("bc-commentaire-actions").style.display = clotureDefinitive ? "" : "none";
+  document.getElementById("bc-commentaire-note").style.display = clotureDefinitive ? "none" : "";
 
   var hint = document.getElementById("bc-cloture-hint");
   if(clotureDefinitive){
@@ -1601,6 +1631,7 @@ function enregistrerBudgetActuel(){
     if(!confirm("Tu clôtures " + moisLisible(budgetActuel.mois) + ".\n\nAprès enregistrement, plus aucune modification ne sera possible sur ce mois.\n\nContinuer ?")) return;
   }
   budgetActuel.cloture = veutCloturer;
+  budgetActuel.commentaire = document.getElementById("bc-commentaire").value;
   var btn = document.getElementById("bc-enregistrer");
   btn.disabled = true; btn.textContent = "…";
   var moisEnr = budgetActuel.mois;
@@ -1613,6 +1644,23 @@ function enregistrerBudgetActuel(){
   }).then(function(){
     btn.textContent = "Enregistrer";
     appliquerVerrouBudget();   // laisse le verrou décider si le bouton reste désactivé (mois clôturé)
+  });
+}
+
+function enregistrerCommentaireBudget(){
+  if(!budgetActuel || !budgetActuel.mois) return;
+  var texte = document.getElementById("bc-commentaire").value;
+  var btn = document.getElementById("bc-enr-commentaire");
+  btn.disabled = true; btn.textContent = "…";
+  enregistrerCommentaire(budgetActuel.mois, texte).then(function(){
+    budgetActuel.commentaire = texte;
+    var enBase = budgetMois.filter(function(b){ return b.mois === budgetActuel.mois; })[0];
+    if(enBase) enBase.commentaire = texte;   // garde le cache à jour sans tout recharger
+    toast("Commentaire enregistré.");
+  }).catch(function(e){
+    banniere("Échec de l'enregistrement du commentaire : " + e.message);
+  }).then(function(){
+    btn.disabled = false; btn.textContent = "Enregistrer le commentaire";
   });
 }
 
@@ -2095,6 +2143,7 @@ window.moisBudgetDecal = moisBudgetDecal;
 window.ajouterPostePonctuel = ajouterPostePonctuel;
 window.ajouterAjustement = ajouterAjustement;
 window.enregistrerBudgetActuel = enregistrerBudgetActuel;
+window.enregistrerCommentaireBudget = enregistrerCommentaireBudget;
 window.appliquerVerrouBudget = appliquerVerrouBudget;
 
 document.getElementById("overlay").addEventListener("click", function(e){
